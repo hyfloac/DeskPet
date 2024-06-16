@@ -1,13 +1,20 @@
 #include "PetAI.h"
+#include "PetManager.hpp"
+#include "PetBehaviors.hpp"
+#include "BehaviorTree.hpp"
 #include <SysLib.h>
 #include <new>
 
-const PetFunctions* g_PetFunctions;
-PetAppHandle g_PetHandle;
-void* g_PetCallbackHandle;
+PetManager g_PetManager;
+
+static bool s_ShouldExit = false;
+
+static PetStatus NotifyExit(const PetAIHandle petAIHandle);
 
 extern "C" PetStatus InitPetAI(const PetFunctions* const pFunctions)
 {
+    InitSys();
+
     if(!pFunctions)
     {
         DebugPrintF(u8"[InitPetAI]: pFunctions was null.\n");
@@ -20,9 +27,9 @@ extern "C" PetStatus InitPetAI(const PetFunctions* const pFunctions)
         return PetInvalidArg;
     }
 
-    g_PetFunctions = pFunctions;
-    g_PetHandle.Ptr = nullptr;
-    g_PetCallbackHandle = nullptr;
+    g_PetManager.AppFunctions() = pFunctions;
+    g_PetManager.AppHandle().Ptr = nullptr;
+    g_PetManager.PetCallbackHandle() = nullptr;
 
     return PetSuccess;
 }
@@ -31,15 +38,16 @@ static PetStatus LoadState(const uint8_t** const ppBuffer) noexcept;
 
 extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
 {
-    if(!g_PetFunctions)
+    if(!g_PetManager.AppFunctions())
     {
         return PetSuccess;
     }
 
     PetAICallbacks callbacks {};
-    callbacks.Handle.Ptr = g_PetCallbackHandle;
+    callbacks.Handle.Ptr = g_PetManager.PetCallbackHandle();
+    callbacks.NotifyExit = NotifyExit;
 
-    PetStatus status = g_PetFunctions->CreatePetApp(&g_PetHandle, &callbacks);
+    PetStatus status = g_PetManager.AppFunctions()->CreatePetApp(&g_PetManager.AppHandle(), &callbacks);
 
     if(!IsStatusSuccess(status))
     {
@@ -57,7 +65,40 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
 
     delete[] stateBuffer;
 
-    status = g_PetFunctions->DestroyPetApp(g_PetHandle);
+    Blackboard blackboard;
+    BehaviorTreeExecutor behaviorTreeExecutor(&g_RootNode, &blackboard, &g_PetManager);
+
+    TimeMs_t lastTime = GetCurrentTimeMs();
+
+    while(!s_ShouldExit)
+    {
+        const TimeMs_t currentTime = GetCurrentTimeMs();
+
+        const float deltaTime = static_cast<float>(currentTime - lastTime) / 1000.0f;
+
+        if(g_PetManager.AppFunctions()->Update)
+        {
+            g_PetManager.AppFunctions()->Update(g_PetManager.AppHandle(), deltaTime);
+        }
+
+        if(s_ShouldExit)
+        {
+            break;
+        }
+
+        behaviorTreeExecutor.Tick(deltaTime);
+
+        if(g_PetManager.AppFunctions()->Sleep)
+        {
+            TimeMs_t sleepTime = 5;
+            g_PetManager.AppFunctions()->Sleep(g_PetManager.AppHandle(), &sleepTime);
+        }
+
+        lastTime = currentTime;
+    }
+
+
+    status = g_PetManager.AppFunctions()->DestroyPetApp(g_PetManager.AppHandle());
 
     if(!IsStatusSuccess(status))
     {
@@ -72,13 +113,13 @@ static PetStatus LoadState(const uint8_t** const ppBuffer) noexcept
 {
     constexpr PetFileHandle dummyFileHandle = 1337;
 
-    if(!g_PetFunctions->LoadPetState)
+    if(!g_PetManager.AppFunctions()->LoadPetState)
     {
         return PetNotImplemented;
     }
 
     size_t stateSize;
-    PetStatus status = g_PetFunctions->LoadPetState(g_PetHandle, dummyFileHandle, 0, nullptr, &stateSize);
+    PetStatus status = g_PetManager.AppFunctions()->LoadPetState(g_PetManager.AppHandle(), dummyFileHandle, 0, nullptr, &stateSize);
 
     if(!IsStatusSuccess(status))
     {
@@ -94,7 +135,7 @@ static PetStatus LoadState(const uint8_t** const ppBuffer) noexcept
     uint8_t* buffer = new(::std::nothrow) uint8_t[stateSize];
 
     size_t stateSizeRead;
-    status = g_PetFunctions->LoadPetState(g_PetHandle, dummyFileHandle, 0, buffer, &stateSizeRead);
+    status = g_PetManager.AppFunctions()->LoadPetState(g_PetManager.AppHandle(), dummyFileHandle, 0, buffer, &stateSizeRead);
 
     if(!IsStatusSuccess(status))
     {
@@ -111,6 +152,14 @@ static PetStatus LoadState(const uint8_t** const ppBuffer) noexcept
 
     *ppBuffer = buffer;
 
+    return PetSuccess;
+}
+
+static PetStatus NotifyExit(const PetAIHandle petAIHandle)
+{
+    (void) petAIHandle;
+
+    s_ShouldExit = true;
     return PetSuccess;
 }
 

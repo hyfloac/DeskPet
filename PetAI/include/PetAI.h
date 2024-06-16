@@ -1,3 +1,6 @@
+/**
+ * @file
+ */
 #pragma once
 
 #ifdef __cplusplus
@@ -10,6 +13,7 @@ extern "C" {
 #include <stdint.h>
 // ReSharper disable once CppUnusedIncludeDirective
 #include <stdlib.h>
+#include <SysLib.h>
 
 #ifdef __cplusplus
   #ifdef _MSVC_LANG
@@ -49,14 +53,24 @@ extern "C" {
 
 typedef int PetStatus;
 
+#if defined(PET_NO_SIZED_ENUMS)
+#define PetSuccess (0u)
+#define PetNoMoreItems (1u)
+#define PetEarlyWakeup (1u)
+#define PetFail (0xC0000001u)
+#define PetInvalidArg (0xC0000002u)
+#define PetNotImplemented (0xC0000003u)
+#else
 typedef enum PetStatuses : uint32_t
 {
     PetSuccess = 0,
-    NoMoreItems = 1,
+    PetNoMoreItems = 1,
+    PetEarlyWakeup = 2,
     PetFail = 0xC0000001,
     PetInvalidArg = 0xC0000002,
     PetNotImplemented = 0xC0000003,
 } PetStatuses;
+#endif
 
 inline bool IsStatusSuccess(const PetStatus status)
 {
@@ -87,35 +101,35 @@ typedef struct PetHandle {
 struct PetAICallbacks;
 
 /**
- * Create the pet implementation.
+ * Create the pet application.
  *
- *   This is simply the function for initializing the implementation's
+ *   This is simply the function for initializing the application's
  * pet controller class, this has nothing to do with individual pets.
  *
- *   The Pet implementation should use this function to allocate a
- * state object and store it into pOutPetHandle.
+ *   The Pet application should use this function to allocate a state
+ * object and store it into pOutPetHandle.
  *
- * @param pOutPetAppHandle A pointer to the handle for the
- *   implementation. The implementation should store a value
- *   sizeof(void*) that it will use to store its state.
+ * @param pOutPetAppHandle A pointer to the handle for the application.
+ *   The application should store a value sizeof(void*) that it will
+ *   use to store its state.
  * @param pPetAICallbacks A pointer to a set of callbacks to call into
- *   the PetAI library. The implementation should store this object in
+ *   the PetAI library. The application should store this object in
  *   its entirety.
  * @return A status code.
  */
 typedef PetStatus CreatePetApp_f(PetAppHandle* pOutPetAppHandle, const PetAICallbacks* pPetAICallbacks);
 /**
- * Destroy the pet implementation.
+ * Destroy the pet application.
  *
- *   This is simply the function for destroying the implementation's
- * pet controller class, this has nothing to do with individual pets.
+ *   This is simply the function for destroying the application's pet
+ * controller class, this has nothing to do with individual pets.
  *
- *   The pet implementation should use this function to free the state
+ *   The pet application should use this function to free the state
  * object stored in petHandle. From this point no more functions will
  * be called in the PetFunctions object without a preceding call the
  * CreatePet.
  *
- * @param petAppHandle The state object the implementation should free.
+ * @param petAppHandle The state object the application should free.
  * @return A status code.
  */
 typedef PetStatus DestroyPetApp_f(PetAppHandle petAppHandle);
@@ -124,7 +138,7 @@ typedef PetStatus DestroyPetApp_f(PetAppHandle petAppHandle);
  * Specifies the file to load or save to.
  *
  *   This is essentially equivalent to a file path, the difference
- * being that it is on the pet implementation to decide where and how
+ * being that it is on the pet application to decide where and how
  * the file is stored.
  */
 typedef uint16_t PetFileHandle;
@@ -132,13 +146,49 @@ typedef uint16_t PetFileHandle;
 typedef PetStatus SavePetState_f(PetAppHandle petAppHandle, PetFileHandle file, size_t offset, const void* pData, const size_t size);
 typedef PetStatus LoadPetState_f(PetAppHandle petAppHandle, PetFileHandle file, size_t offset, void* pData, size_t* pSize);
 
+/**
+ *   This is used to tell the application that Pet AI has no tasks to
+ * do for a given period of time, and thus would like to sleep. It is
+ * up to the application to decide what to do during this time.
+ *
+ *   The application does not need to sleep for the requested amount of
+ * time, and it does not need to report how long it actually slept for,
+ * though this might cause some slippage in how long a task was
+ * supposed to take.
+ * 
+ * @param petAppHandle The state object of the application.
+ * @param pSleepTime A pointer to how much time to sleep, and to store
+ *   how much time was actually slept. 
+ * @return A status code.
+ */
+typedef PetStatus Sleep_f(PetAppHandle petAppHandle, TimeMs_t* pSleepTime);
+/**
+ *   This is used to tell the application that Pet AI is giving up a
+ * small amount of time for other processes to run. This can take as
+ * little or as long as the application wants, though it should ideally
+ * return control to Pet AI as soon as possible.
+ *
+ *   The application does not need to report how long it actually slept
+ * for, though this might cause some slippage in how long a task was
+ * supposed to take.
+ * 
+ * @param petAppHandle The state object of the application.
+ * @param pSleepTime A to store how much time was slept. 
+ * @return A status code.
+ */
+typedef PetStatus Yield_f(PetAppHandle petAppHandle, TimeMs_t* pSleepTime);
+
+typedef PetStatus Update_f(PetAppHandle petAppHandle, float deltaTime);
+
 typedef PetStatus CreatePet_f(PetAppHandle petAppHandle);
 
+typedef PetStatus NotifyExit_f(PetAIHandle petAIHandle);
 typedef PetStatus EnumPets_f(PetAIHandle petAIHandle, PetHandle* pPetHandle);
 
 typedef struct PetAICallbacks
 {
     PetAIHandle Handle;
+    NotifyExit_f* NotifyExit;
     EnumPets_f* EnumPets;
 } PetAICallbacks;
 
@@ -151,6 +201,11 @@ typedef struct PetFunctions
 
     SavePetState_f* SavePetState;
     LoadPetState_f* LoadPetState;
+
+    Sleep_f* Sleep;
+    Yield_f* Yield;
+
+    Update_f* Update;
 } PetFunctions;
 
 PetStatus TAU_UTILS_LIB InitPetAI(const PetFunctions* const pFunctions);

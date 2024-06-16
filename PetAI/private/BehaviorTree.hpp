@@ -12,6 +12,8 @@ class BehaviorTreeActionNode;
 
 class BehaviorTreeExecutor;
 
+class PetManager;
+
 class BehaviorTreeNode
 {
     DEFAULT_CONSTRUCT_PO(BehaviorTreeNode);
@@ -117,7 +119,7 @@ class BehaviorTreeSelectorNode : public BehaviorTreeContainerNode
     DEFAULT_CM_PU(BehaviorTreeSelectorNode);
     DEFAULT_DESTRUCT_O(BehaviorTreeSelectorNode);
 public:
-    using SelectorFunc = ::std::function<::std::int32_t(void*&, const BehaviorTreeSelectorNode&, Blackboard&)>;
+    using SelectorFunc = ::std::function<::std::int32_t(void*&, PetManager&, const BehaviorTreeSelectorNode&, Blackboard&)>;
 public:
     BehaviorTreeSelectorNode(
         const ::std::uint32_t childCount,
@@ -145,18 +147,22 @@ class BehaviorTreeRepeatNode : public BehaviorTreeNode
     DEFAULT_CM_PU(BehaviorTreeRepeatNode);
     DEFAULT_DESTRUCT_O(BehaviorTreeRepeatNode);
 public:
-    using ContinuationFunc = ::std::function<bool(void*&, const BehaviorTreeRepeatNode&, Blackboard&)>;
+    using ContinuationFunc = ::std::function<bool(void*&, PetManager&, const BehaviorTreeRepeatNode&, Blackboard&)>;
 public:
     BehaviorTreeRepeatNode(
         BehaviorTreeNode* const child,
         const ContinuationFunc& continuation
     ) noexcept
-        : m_Child(child)
+        : BehaviorTreeNode(nullptr)
+        , m_Child(child)
+        , m_Continuation(continuation)
     {
         if(m_Child)
         {
             m_Child->Parent() = this;
         }
+
+        StateIndex() = -1;
     }
 
     [[nodiscard]] ::std::uint32_t ChildCount() const noexcept override { return 1; }
@@ -181,7 +187,7 @@ class BehaviorTreeActionNode : public BehaviorTreeNode
     DEFAULT_CM_PU(BehaviorTreeActionNode);
     DEFAULT_DESTRUCT_O(BehaviorTreeActionNode);
 public:
-    using ActionHandler = ::std::function<bool(void*&, const BehaviorTreeActionNode&, Blackboard&, float deltaTime)>;
+    using ActionHandler = ::std::function<bool(void*&, PetManager&, const BehaviorTreeActionNode&, Blackboard&, float deltaTime)>;
 public:
     BehaviorTreeActionNode(
         const ActionHandler& handler
@@ -208,11 +214,13 @@ class BehaviorTreeExecutor
 public:
     BehaviorTreeExecutor(
         BehaviorTreeRepeatNode* const root,
-        Blackboard* const blackboard
+        Blackboard* const blackboard,
+        PetManager* const petManager
     ) noexcept
         : m_Root(root)
         , m_Current(nullptr)
         , m_Blackboard(blackboard)
+        , m_PetManager(petManager)
         , m_CurrentState(Uninitialized)
         , m_CurrentDeltaTime(0.0f)
         , m_StateCount(0)
@@ -243,6 +251,7 @@ private:
     BehaviorTreeRepeatNode* m_Root;
     const BehaviorTreeNode* m_Current;
     Blackboard* m_Blackboard;
+    PetManager* m_PetManager;
     State m_CurrentState;
     float m_CurrentDeltaTime;
     ::std::size_t m_StateCount;

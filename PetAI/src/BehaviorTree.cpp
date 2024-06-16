@@ -33,7 +33,9 @@ void BehaviorTreeExecutor::Tick(const float deltaTime) noexcept
 
     if(m_CurrentState == Uninitialized)
     {
-        if(!m_Root->Continuation()(m_State[m_Root->StateIndex()], *m_Root, *m_Blackboard))
+        InitState();
+
+        if(!m_Root->Continuation()(m_State[m_Root->StateIndex()], *m_PetManager, *m_Root, *m_Blackboard))
         {
             return;
         }
@@ -112,7 +114,7 @@ void BehaviorTreeExecutor::Execute(const BehaviorTreeSequenceNode& node) noexcep
 
 void BehaviorTreeExecutor::Execute(const BehaviorTreeSelectorNode& node) noexcept
 {
-    const ::std::int32_t nodeIndex = node.Selector()(m_State[node.StateIndex()], node, *m_Blackboard);
+    const ::std::int32_t nodeIndex = node.Selector()(m_State[node.StateIndex()], *m_PetManager, node, *m_Blackboard);
 
     if(nodeIndex < 0 || static_cast<::std::uint32_t>(nodeIndex) >= node.ChildCount())
     {
@@ -125,7 +127,7 @@ void BehaviorTreeExecutor::Execute(const BehaviorTreeSelectorNode& node) noexcep
 
 void BehaviorTreeExecutor::Execute(const BehaviorTreeRepeatNode& node) noexcept
 {
-    if(!node.Continuation()(m_State[node.StateIndex()], node, *m_Blackboard))
+    if(!node.Continuation()(m_State[node.StateIndex()], *m_PetManager, node, *m_Blackboard))
     {
         Execute(node.Parent());
         return;
@@ -142,7 +144,7 @@ void BehaviorTreeExecutor::Execute(const BehaviorTreeActionNode& node) noexcept
         return;
     }
 
-    if(node.Handler()(m_State[node.StateIndex()], node, *m_Blackboard, m_CurrentDeltaTime))
+    if(node.Handler()(m_State[node.StateIndex()], *m_PetManager, node, *m_Blackboard, m_CurrentDeltaTime))
     {
         m_CurrentState = FinishedNode;
     }
@@ -194,10 +196,11 @@ void BehaviorTreeExecutor::InitState() noexcept
 
     ::std::int32_t index = startIndex;
 
+    node->StateIndex() = index++;
+
     for(::std::uint32_t i = 0; i < node->ChildCount(); ++i)
     {
-        node->StateIndex() = index++;
-        index += InitChildren(node->Children()[i], index);
+        index = InitChildren(node->Children()[i], index);
     }
 
     return index;
