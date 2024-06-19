@@ -9,6 +9,7 @@ PetManager g_PetManager;
 
 static bool s_ShouldExit = false;
 
+// ReSharper disable once CppFunctionIsNotImplemented
 static PetStatus NotifyExit(const PetAIHandle petAIHandle);
 
 extern "C" PetStatus InitPetAI(const PetFunctions* const pFunctions)
@@ -34,6 +35,7 @@ extern "C" PetStatus InitPetAI(const PetFunctions* const pFunctions)
     return PetSuccess;
 }
 
+// ReSharper disable once CppFunctionIsNotImplemented
 static PetStatus LoadState(const uint8_t** const ppBuffer) noexcept;
 
 extern "C" PetStatus TAU_UTILS_LIB RunPetAI()

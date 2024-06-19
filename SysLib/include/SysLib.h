@@ -64,6 +64,44 @@ TimeMs_t GetCurrentTimeMs(void);
 
 void DebugPrintF(const PrintChar_t* fmt, ...);
 
+uint32_t UpdateCRC32(uint32_t initial, const void* data, const size_t length);
+
+size_t StringLengthC(const char* string);
+#if USE_CHAR8_T
+size_t StringLength8(const char8_t* string);
+#endif
+
+int StringCompareC(const char* left, const char* right);
+#if USE_CHAR8_T
+int StringCompare8(const char8_t* left, const char8_t* right);
+#endif
+
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+[[nodiscard]] static inline size_t StringLength(const char* const string) noexcept
+{
+    return StringLengthC(string);
+}
+[[nodiscard]] static inline size_t StringLength(const char8_t* const string) noexcept
+{
+    return StringLength8(string);
+}
+template<typename CharT, size_t Length>
+[[nodiscard]] static inline size_t StringLength(const CharT(&)[Length]) noexcept
+{
+    return Length - 1;
+}
+
+[[nodiscard]] static inline int StringCompare(const char* const left, const char* const right) noexcept
+{
+    return StringCompareC(left, right);
+}
+[[nodiscard]] static inline int StringCompare(const char8_t* const left, const char8_t* const right) noexcept
+{
+    return StringCompare8(left, right);
+}
+
 #endif

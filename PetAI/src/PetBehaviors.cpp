@@ -34,6 +34,9 @@ static bool Bark(void*& state, PetManager& petManager, const BehaviorTreeActionN
     return true;
 }
 
+//   This is currently implemented by sleeping for 50ms at a time,
+// though arguably a more correct method would be to accumulate the
+// delta time, and let the main event loop do the sleeping.
 static bool Sleep5s(void*& state, PetManager& petManager, const BehaviorTreeActionNode& node, Blackboard& blackboard, float deltaTime) noexcept
 {
     (void) node;
