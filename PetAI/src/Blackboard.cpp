@@ -173,6 +173,8 @@ Blackboard::Blackboard(const BlackboardKeyManager& keyManager) noexcept
     , m_KeyOffsets(nullptr)
     , m_CurrentOffset(0)
 {
+    ZeroMem(m_BlackboardData, m_BlackboardSize);
+
     keyManager.NameTree().Iterate(this, &Blackboard::CountKeyCallback);
 
     m_KeyOffsets = new size_t[m_KeyCount];

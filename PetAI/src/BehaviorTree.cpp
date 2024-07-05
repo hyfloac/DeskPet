@@ -35,7 +35,7 @@ void BehaviorTreeExecutor::Tick(const float deltaTime) noexcept
     {
         InitState();
 
-        if(!m_Root->Continuation()(m_State[m_Root->StateIndex()], *m_PetManager, *m_Root, *m_Blackboard))
+        if(!m_Root->Continuation()(*m_PetManager, *m_Root, *m_Blackboard))
         {
             return;
         }
@@ -67,14 +67,11 @@ void BehaviorTreeExecutor::Tick(const float deltaTime) noexcept
     }
 }
 
-static ::std::int32_t SequenceActionHandler(void*& state, const BehaviorTreeSequenceNode& node) noexcept
+static ::std::int32_t SequenceActionHandler(const BehaviorTreeSequenceNode& node, Blackboard& blackboard, const BlackboardKey sequenceKey) noexcept
 {
-    if(!state)
-    {
-        state = new ::std::int32_t(-1);
-    }
+    BehaviorTreeSequenceNode::SequenceKeyT* currentIndex = blackboard.GetT<BehaviorTreeSequenceNode::SequenceKeyT>(sequenceKey);
 
-    ::std::int32_t* currentIndex = static_cast<::std::int32_t*>(state);
+    const BehaviorTreeSequenceNode::SequenceKeyT retVal = *currentIndex;
 
     ++(*currentIndex);
 
@@ -83,7 +80,7 @@ static ::std::int32_t SequenceActionHandler(void*& state, const BehaviorTreeSequ
         *currentIndex = 0;
     }
 
-    return *currentIndex;
+    return retVal;
 }
 
 void BehaviorTreeExecutor::Execute(const BehaviorTreeNode* const node) noexcept
@@ -101,7 +98,7 @@ void BehaviorTreeExecutor::Execute(const BehaviorTreeNode& node) noexcept
 
 void BehaviorTreeExecutor::Execute(const BehaviorTreeSequenceNode& node) noexcept
 {
-    const ::std::int32_t nodeIndex = SequenceActionHandler(m_State[node.StateIndex()], node);
+    const ::std::int32_t nodeIndex = SequenceActionHandler(node, *m_Blackboard, node.SequenceKey());
 
     if(nodeIndex < 0 || static_cast<::std::uint32_t>(nodeIndex) >= node.ChildCount())
     {
@@ -114,7 +111,15 @@ void BehaviorTreeExecutor::Execute(const BehaviorTreeSequenceNode& node) noexcep
 
 void BehaviorTreeExecutor::Execute(const BehaviorTreeSelectorNode& node) noexcept
 {
-    const ::std::int32_t nodeIndex = node.Selector()(m_State[node.StateIndex()], *m_PetManager, node, *m_Blackboard);
+    BehaviorTreeSelectorNode::SelectorKeyT* selector = m_Blackboard->GetT<BehaviorTreeSelectorNode::SelectorKeyT>(node.SelectorKey());
+    if(*selector)
+    {
+        *selector = false;
+        Execute(node.Parent());
+        return;
+    }
+
+    const ::std::int32_t nodeIndex = node.Selector()(*m_PetManager, node, *m_Blackboard);
 
     if(nodeIndex < 0 || static_cast<::std::uint32_t>(nodeIndex) >= node.ChildCount())
     {
@@ -122,12 +127,14 @@ void BehaviorTreeExecutor::Execute(const BehaviorTreeSelectorNode& node) noexcep
         return;
     }
 
+    *selector = true;
+
     Execute(node.Children()[nodeIndex]);
 }
 
 void BehaviorTreeExecutor::Execute(const BehaviorTreeRepeatNode& node) noexcept
 {
-    if(!node.Continuation()(m_State[node.StateIndex()], *m_PetManager, node, *m_Blackboard))
+    if(!node.Continuation()(*m_PetManager, node, *m_Blackboard))
     {
         Execute(node.Parent());
         return;
@@ -144,7 +151,7 @@ void BehaviorTreeExecutor::Execute(const BehaviorTreeActionNode& node) noexcept
         return;
     }
 
-    if(node.Handler()(m_State[node.StateIndex()], *m_PetManager, node, *m_Blackboard, m_CurrentDeltaTime))
+    if(node.Handler()(*m_PetManager, node, *m_Blackboard, m_CurrentDeltaTime))
     {
         m_CurrentState = FinishedNode;
     }
@@ -157,17 +164,10 @@ void BehaviorTreeExecutor::InitState() noexcept
         return;
     }
 
-    const ::std::int32_t nodeCount = CountChildren(m_Root);
-
     if(m_Root->StateIndex() < 0)
     {
         InitChildren(m_Root, 0);
     }
-
-    m_StateCount = nodeCount;
-
-    m_State = new void* [nodeCount];
-    (void) ::std::memset(m_State, 0, sizeof(*m_State) * nodeCount);
 }
 
 ::std::int32_t BehaviorTreeExecutor::CountChildren(const BehaviorTreeNode* const node) const noexcept

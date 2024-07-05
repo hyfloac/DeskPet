@@ -100,17 +100,26 @@ class BehaviorTreeSequenceNode : public BehaviorTreeContainerNode
     DEFAULT_CM_PU(BehaviorTreeSequenceNode);
     DEFAULT_DESTRUCT_O(BehaviorTreeSequenceNode);
 public:
+    using SequenceKeyT = ::std::int32_t;
+public:
     BehaviorTreeSequenceNode(
         const ::std::uint32_t childCount,
-        BehaviorTreeNode** const children
+        BehaviorTreeNode** const children,
+        const BlackboardKey sequenceKey
     ) noexcept
         : BehaviorTreeContainerNode(childCount, children)
+        , m_SequenceKey(sequenceKey)
     { }
 
     [[nodiscard]]       BehaviorTreeSequenceNode* AsSequence()       noexcept override { return this; }
     [[nodiscard]] const BehaviorTreeSequenceNode* AsSequence() const noexcept override { return this; }
 
     void Execute(BehaviorTreeExecutor& executor) const noexcept override;
+
+    [[nodiscard]] BlackboardKey& SequenceKey()       noexcept { return m_SequenceKey; }
+    [[nodiscard]] BlackboardKey  SequenceKey() const noexcept { return m_SequenceKey; }
+private:
+    BlackboardKey m_SequenceKey;
 };
 
 class BehaviorTreeSelectorNode : public BehaviorTreeContainerNode
@@ -119,15 +128,18 @@ class BehaviorTreeSelectorNode : public BehaviorTreeContainerNode
     DEFAULT_CM_PU(BehaviorTreeSelectorNode);
     DEFAULT_DESTRUCT_O(BehaviorTreeSelectorNode);
 public:
-    using SelectorFunc = ::std::function<::std::int32_t(void*&, PetManager&, const BehaviorTreeSelectorNode&, Blackboard&)>;
+    using SelectorFunc = ::std::function<::std::int32_t(PetManager&, const BehaviorTreeSelectorNode&, Blackboard&)>;
+    using SelectorKeyT = bool;
 public:
     BehaviorTreeSelectorNode(
         const ::std::uint32_t childCount,
         BehaviorTreeNode** const children,
-        const SelectorFunc& selector
+        const SelectorFunc& selector,
+        const BlackboardKey selectorKey
     ) noexcept
         : BehaviorTreeContainerNode(childCount, children)
         , m_Selector(selector)
+        , m_SelectorKey(selectorKey)
     { }
 
     [[nodiscard]]       BehaviorTreeSelectorNode* AsSelector()       noexcept override { return this; }
@@ -137,8 +149,13 @@ public:
     
     [[nodiscard]]       SelectorFunc& Selector()       noexcept { return m_Selector; }
     [[nodiscard]] const SelectorFunc& Selector() const noexcept { return m_Selector; }
+
+    [[nodiscard]] BlackboardKey& SelectorKey()       noexcept { return m_SelectorKey; }
+    [[nodiscard]] BlackboardKey  SelectorKey() const noexcept { return m_SelectorKey; }
+
 private:
     SelectorFunc m_Selector;
+    BlackboardKey m_SelectorKey;
 };
 
 class BehaviorTreeRepeatNode : public BehaviorTreeNode
@@ -147,7 +164,7 @@ class BehaviorTreeRepeatNode : public BehaviorTreeNode
     DEFAULT_CM_PU(BehaviorTreeRepeatNode);
     DEFAULT_DESTRUCT_O(BehaviorTreeRepeatNode);
 public:
-    using ContinuationFunc = ::std::function<bool(void*&, PetManager&, const BehaviorTreeRepeatNode&, Blackboard&)>;
+    using ContinuationFunc = ::std::function<bool(PetManager&, const BehaviorTreeRepeatNode&, Blackboard&)>;
 public:
     BehaviorTreeRepeatNode(
         BehaviorTreeNode* const child,
@@ -187,7 +204,7 @@ class BehaviorTreeActionNode : public BehaviorTreeNode
     DEFAULT_CM_PU(BehaviorTreeActionNode);
     DEFAULT_DESTRUCT_O(BehaviorTreeActionNode);
 public:
-    using ActionHandler = ::std::function<bool(void*&, PetManager&, const BehaviorTreeActionNode&, Blackboard&, float deltaTime)>;
+    using ActionHandler = ::std::function<bool(PetManager&, const BehaviorTreeActionNode&, Blackboard&, float deltaTime)>;
 public:
     BehaviorTreeActionNode(
         const ActionHandler& handler
@@ -223,8 +240,6 @@ public:
         , m_PetManager(petManager)
         , m_CurrentState(Uninitialized)
         , m_CurrentDeltaTime(0.0f)
-        , m_StateCount(0)
-        , m_State(nullptr)
     { }
 
     void Tick(const float deltaTime) noexcept;
@@ -254,6 +269,4 @@ private:
     PetManager* m_PetManager;
     State m_CurrentState;
     float m_CurrentDeltaTime;
-    ::std::size_t m_StateCount;
-    void** m_State;
 };

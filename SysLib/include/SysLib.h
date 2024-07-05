@@ -76,6 +76,8 @@ int StringCompareC(const char* left, const char* right);
 int StringCompare8(const char8_t* left, const char8_t* right);
 #endif
 
+void ZeroMem(void* data, const size_t length);
+
 #ifdef __cplusplus
 }
 #endif
