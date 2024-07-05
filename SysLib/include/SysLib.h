@@ -81,6 +81,7 @@ int StringCompare8(const char8_t* left, const char8_t* right);
 #endif
 
 #ifdef __cplusplus
+extern "C++" {
 [[nodiscard]] static inline size_t StringLength(const char* const string) noexcept
 {
     return StringLengthC(string);
@@ -103,5 +104,5 @@ template<typename CharT, size_t Length>
 {
     return StringCompare8(left, right);
 }
-
+}
 #endif

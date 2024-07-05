@@ -26,18 +26,14 @@ FileBlockHandle FileBlock::Acquire(uint8_t*& receivingBlock) noexcept
 }
 
 static FileBlock BlackboardKeyBlock;
+static FileBlock BlackboardKeyStringBlock;
 
 #pragma pack(push, 1)
-struct BlackboardKeyFileBaseHeader final
+struct BlackboardKeyIndice final
 {
-    char Magic[4];
-    uint16_t Endian;
-    uint16_t Version;
-    uint16_t MinVersion;
-    uint32_t Reserved[8];
-    uint32_t NextHeaderOffset;
-    uint32_t KeyIndicesOffset;
-    uint32_t StringBlobOffset;
+    int32_t Key;
+    uint32_t Hash;
+    uint32_t NameOffset;
 };
 #pragma pack(pop)
 
@@ -55,11 +51,35 @@ PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager
         return PetFail;
     }
 
+    m_FileLength = 0;
     m_CurrentOffset = 0;
     m_FileOffset = 0;
     m_Length = 0;
 
-    petManager.AppFunctions()->LoadPetState(petManager.AppHandle(), BlackboardKeyFileHandle, m_FileOffset, m_DataBlock, &m_Length);
+    PetStatus status = petManager.AppFunctions()->LoadPetState(petManager.AppHandle(), BlackboardKeyFileHandle, 0, nullptr, &m_FileLength);
+
+    if(!IsStatusSuccess(status))
+    {
+        if(status == PetInvalidArg)
+        {
+            return PetFail;
+        }
+
+        return status;
+    }
+
+    status = petManager.AppFunctions()->LoadPetState(petManager.AppHandle(), BlackboardKeyFileHandle, m_FileOffset, m_DataBlock, &m_Length);
+
+    if(!IsStatusSuccess(status))
+    {
+        if(status == PetInvalidArg)
+        {
+            return PetFail;
+        }
+
+        return status;
+    }
+
     m_FileOffset += m_Length;
 
     if(m_Length < sizeof(BlackboardKeyFileBaseHeader))
@@ -81,6 +101,11 @@ PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager
 
     if(baseHeader->Endian != GoodEndian)
     {
+        if(baseHeader->Endian != WrongEndian)
+        {
+            return PetFail;
+        }
+
         FileUtils::FlipEndian(baseHeader->Version);
         FileUtils::FlipEndian(baseHeader->MinVersion);
         FileUtils::FlipEndian(baseHeader->Reserved[0]);
@@ -91,27 +116,37 @@ PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager
         FileUtils::FlipEndian(baseHeader->Reserved[5]);
         FileUtils::FlipEndian(baseHeader->Reserved[6]);
         FileUtils::FlipEndian(baseHeader->Reserved[7]);
+        FileUtils::FlipEndian(baseHeader->KeyCount);
         FileUtils::FlipEndian(baseHeader->NextHeaderOffset);
         FileUtils::FlipEndian(baseHeader->KeyIndicesOffset);
         FileUtils::FlipEndian(baseHeader->StringBlobOffset);
     }
 
+    m_BaseHeader = *baseHeader;
+
     switch(baseHeader->Version)
     {
-        case FileVersion1_0: return LoadV1_0(keyManager, petManager, ::std::move(block));
+        case FileVersion1_0: return LoadV1_0(keyManager, petManager);
         default: break;
     }
 
     switch(baseHeader->MinVersion)
     {
-        case FileVersion1_0: return LoadV1_0(keyManager, petManager, ::std::move(block));
+        case FileVersion1_0: return LoadV1_0(keyManager, petManager);
         default: break;
     }
 
     return PetFail;
 }
 
-PetStatus BlackboardKeyLoader::LoadV1_0(BlackboardKeyManager& keyManager, PetManager& petManager, FileBlockHandle block) noexcept
+PetStatus BlackboardKeyLoader::LoadV1_0(BlackboardKeyManager& keyManager, PetManager& petManager) noexcept
 {
+    size_t currentKeyOffset = m_BaseHeader.KeyIndicesOffset;
+
+    if(currentKeyOffset >= m_FileLength)
+    {
+        return PetFail;
+    }
+
     return PetSuccess;
 }

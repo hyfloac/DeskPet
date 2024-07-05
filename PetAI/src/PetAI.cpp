@@ -67,7 +67,9 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
 
     delete[] stateBuffer;
 
-    Blackboard blackboard;
+    BlackboardKeyManager blackboardKeyManager;
+
+    Blackboard blackboard(blackboardKeyManager);
     BehaviorTreeExecutor behaviorTreeExecutor(&g_RootNode, &blackboard, &g_PetManager);
 
     TimeMs_t lastTime = GetCurrentTimeMs();

@@ -5,6 +5,12 @@
 #include <SysLib.h>
 #include <type_traits>
 
+template<typename T>
+T maxT(const T a, const T b) noexcept
+{
+    return a > b ? a : b;
+}
+
 enum class InsertMethod
 {
     Ignore = 0,
@@ -737,25 +743,25 @@ private:
         if constexpr(IteratorMethod == IteratorMethod::TopDownLR)
         {
             (instance->*func)(tree);
-            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Left, func);
-            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Right, func);
+            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Left, instance, func);
+            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Right, instance, func);
         }
         else if constexpr(IteratorMethod == IteratorMethod::TopDownRL)
         {
             (instance->*func)(tree);
-            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Right, func);
-            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Left, func);
+            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Right, instance, func);
+            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Left, instance, func);
         }
         else if constexpr(IteratorMethod == IteratorMethod::HighestToLowest)
         {
-            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Right, func);
-            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Left, func);
+            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Right, instance, func);
+            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Left, instance, func);
             (instance->*func)(tree);
         }
         else if constexpr(IteratorMethod == IteratorMethod::LowestToHighest)
         {
-            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Left, func);
-            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Right, func);
+            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Left, instance, func);
+            IterateStatic<NodeT, ClassC, FuncT, IteratorMethod>(tree->Right, instance, func);
             (instance->*func)(tree);
         }
     }

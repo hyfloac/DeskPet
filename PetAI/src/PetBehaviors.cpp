@@ -9,11 +9,12 @@
 
 static bool Bark(void*& state, PetManager& petManager, const BehaviorTreeActionNode& node, Blackboard& blackboard, float deltaTime) noexcept;
 static bool Sleep5s(void*& state, PetManager& petManager, const BehaviorTreeActionNode& node, Blackboard& blackboard, float deltaTime) noexcept;
+static bool Sleep5s0(void*& state, PetManager& petManager, const BehaviorTreeActionNode& node, Blackboard& blackboard, float deltaTime) noexcept;
 
 static bool ContinueTree(void*& state, PetManager& petManager, const BehaviorTreeRepeatNode& node, Blackboard& blackboard) noexcept;
 
 static BehaviorTreeActionNode s_BarkAction(Bark);
-static BehaviorTreeActionNode s_SleepAction(Sleep5s);
+static BehaviorTreeActionNode s_SleepAction(Sleep5s0);
 
 static ::std::array<BehaviorTreeNode*, 2> s_BarkSequenceArray({ &s_BarkAction, &s_SleepAction });
 
@@ -37,7 +38,7 @@ static bool Bark(void*& state, PetManager& petManager, const BehaviorTreeActionN
 //   This is currently implemented by sleeping for 50ms at a time,
 // though arguably a more correct method would be to accumulate the
 // delta time, and let the main event loop do the sleeping.
-static bool Sleep5s(void*& state, PetManager& petManager, const BehaviorTreeActionNode& node, Blackboard& blackboard, float deltaTime) noexcept
+[[maybe_unused]] static bool Sleep5s(void*& state, PetManager& petManager, const BehaviorTreeActionNode& node, Blackboard& blackboard, float deltaTime) noexcept
 {
     (void) node;
     (void) blackboard;
@@ -67,6 +68,28 @@ static bool Sleep5s(void*& state, PetManager& petManager, const BehaviorTreeActi
     }
 
     pTimeRemaining -= static_cast<intptr_t>(sleepTime);
+
+    if(pTimeRemaining <= 0)
+    {
+        state = nullptr;
+        return true;
+    }
+
+    state = reinterpret_cast<void*>(pTimeRemaining);  // NOLINT(performance-no-int-to-ptr)
+
+    return false;
+}
+
+static bool Sleep5s0(void*& state, PetManager& petManager, const BehaviorTreeActionNode& node, Blackboard& blackboard, float deltaTime) noexcept
+{
+    if(!state)
+    {
+        state = reinterpret_cast<void*>(5000);
+    }
+
+    intptr_t pTimeRemaining = reinterpret_cast<intptr_t>(state);
+
+    pTimeRemaining -= static_cast<intptr_t>(deltaTime * 1000.0f);
 
     if(pTimeRemaining <= 0)
     {

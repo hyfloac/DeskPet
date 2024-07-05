@@ -51,7 +51,7 @@ extern "C" {
   #define TAU_UTILS_LIB
 #endif
 
-typedef int PetStatus;
+typedef uint32_t PetStatus;
 
 #if defined(PET_NO_SIZED_ENUMS)
 #define PetSuccess (0u)
@@ -74,7 +74,7 @@ typedef enum PetStatuses : uint32_t
 
 inline bool IsStatusSuccess(const PetStatus status)
 {
-    return status >= 0;
+    return status < 0x80000000;
 }
 
 inline bool IsStatusError(const PetStatus status)

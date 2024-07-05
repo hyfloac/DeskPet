@@ -27,7 +27,7 @@ class FileBlockHandle;
 class FileBlock final
 {
 public:
-    static inline consteval size_t BlockSize = 512;
+    static inline constexpr size_t BlockSize = 512;
 public:
     FileBlock() noexcept
         : m_Block{ }
@@ -115,28 +115,56 @@ private:
     friend class FileBlock;
 };
 
+#pragma pack(push, 1)
+struct BlackboardKeyFileBaseHeader final
+{
+    char Magic[4];
+    uint32_t Endian;
+    uint16_t Version;
+    uint16_t MinVersion;
+    uint32_t Reserved[8];
+    uint32_t KeyCount;
+    uint32_t NextHeaderOffset;
+    uint32_t KeyIndicesOffset;
+    uint32_t StringBlobOffset;
+};
+#pragma pack(pop)
+
 class BlackboardKeyLoader final
 {
     DEFAULT_DESTRUCT(BlackboardKeyLoader);
     DELETE_CM(BlackboardKeyLoader);
 public:
-    static inline consteval char FileMagic[4] = { 'B', 'l', 'k', 'K' };
-    static inline consteval uint16_t GoodEndian = 0xFFFE;
-    static inline consteval uint16_t FileVersion1_0 = FileUtils::MakeVersion(1, 0);
+    static inline constexpr char FileMagic[4] = { 'B', 'l', 'k', 'K' };
+    static inline constexpr uint32_t GoodEndian = 0x12345678;
+    static inline constexpr uint32_t WrongEndian = 0x78563412;
+    static inline constexpr uint16_t FileVersion1_0 = FileUtils::MakeVersion(1, 0);
 public:
     BlackboardKeyLoader() noexcept
-        : m_DataBlock(nullptr)
+        : m_FileLength(0)
+        , m_DataBlock(nullptr)
         , m_CurrentOffset(0)
         , m_Length(0)
         , m_FileOffset(0)
+        , m_StringBlock(nullptr)
+        , m_CurrentStringOffset(0)
+        , m_StringLength(0)
+        , m_FileStringOffset(0)
+        , m_BaseHeader{}
     { }
 
     PetStatus Load(BlackboardKeyManager& keyManager, PetManager& petManager) noexcept;
 private:
-    PetStatus LoadV1_0(BlackboardKeyManager& keyManager, PetManager& petManager, FileBlockHandle block) noexcept;
+    PetStatus LoadV1_0(BlackboardKeyManager& keyManager, PetManager& petManager) noexcept;
 private:
+    size_t m_FileLength;
     uint8_t* m_DataBlock;
     uint32_t m_CurrentOffset;
     size_t m_Length;
     size_t m_FileOffset;
+    uint8_t* m_StringBlock;
+    uint32_t m_CurrentStringOffset;
+    size_t m_StringLength;
+    size_t m_FileStringOffset;
+    BlackboardKeyFileBaseHeader m_BaseHeader;
 };
