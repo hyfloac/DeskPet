@@ -119,6 +119,11 @@ public:
     [[nodiscard]] BlackboardKey& SequenceKey()       noexcept { return m_SequenceKey; }
     [[nodiscard]] BlackboardKey  SequenceKey() const noexcept { return m_SequenceKey; }
 private:
+    /**   This is an internal integer that keeps track of which node in the
+     *  sequence we are on.
+     *    It's not pretty, but all state has to be stored in the blackboard, so
+     *  that it can be saved.
+     */
     BlackboardKey m_SequenceKey;
 };
 
@@ -155,6 +160,12 @@ public:
 
 private:
     SelectorFunc m_Selector;
+    /**   This is an internal boolean that is used for return from this selector
+     *  after a subtree finishes executing.
+     *  Without this the executor will get stuck executing at this node.
+     *    It's not pretty, but all state has to be stored in the blackboard, so
+     *  that it can be saved.
+     */
     BlackboardKey m_SelectorKey;
 };
 
