@@ -180,16 +180,71 @@ typedef PetStatus Yield_f(PetAppHandle petAppHandle, TimeMs_t* pSleepTime);
 
 typedef PetStatus Update_f(PetAppHandle petAppHandle, float deltaTime);
 
-typedef PetStatus CreatePet_f(PetAppHandle petAppHandle);
+typedef enum PetGender
+{
+    PetGenderNeuter = 0,
+    PetGenderMale = 1,
+    PetGenderFemale = 2
+} PetGender;
+
+typedef struct CreatePetData
+{
+    PetHandle ParentMale;
+    PetHandle ParentFemale;
+}CreatePetData;
+
+typedef PetStatus CreatePet_f(PetAppHandle petAppHandle, const CreatePetData* pCreatePetData);
+
+typedef enum PetEventType
+{
+    Unknown = 0,
+} PetEventType;
+
+typedef struct PetEventBirth
+{
+    PetHandle ParentMale;
+    PetHandle ParentFemale;
+    PetHandle ChildPet;
+} PetEventBirth;
+
+typedef union PetEventUnion
+{
+    PetEventBirth* Birth;
+} PetEventTypes;
+
+typedef struct PetEventData
+{
+    PetHandle PetHandle;
+    const char* EventName;
+    PetEventType EventType;
+    PetEventUnion Event;
+} PetEventData;
+
+typedef PetStatus PetEvent_f(PetAppHandle petAppHandle, const PetEventData* pPetEventData);
 
 typedef PetStatus NotifyExit_f(PetAIHandle petAIHandle);
-typedef PetStatus EnumPets_f(PetAIHandle petAIHandle, PetHandle* pPetHandle);
+typedef PetStatus EnumPets_f(PetAIHandle petAIHandle, PetHandle* pPetHandle, uint32_t index);
+
+typedef PetStatus GetPetState_f(PetAIHandle petAIHandle, PetHandle petHandle, void** pState, uint32_t* pSize);
+
+typedef struct CreatePetAIData
+{
+    PetHandle ParentMale;
+    PetHandle ParentFemale;
+    PetGender Gender;
+    uint32_t StateSize;
+    void* State;
+} CreatePetAIData;
+
+typedef PetStatus CreatePetAI_f(PetAIHandle petAIHandle, const CreatePetAIData* pCreatePetData, PetHandle* pPetHandle);
 
 typedef struct PetAICallbacks
 {
     PetAIHandle Handle;
     NotifyExit_f* NotifyExit;
     EnumPets_f* EnumPets;
+    GetPetState_f* GetPetState;
+    CreatePetAI_f* CreatePet;
 } PetAICallbacks;
 
 typedef struct PetFunctions
@@ -206,6 +261,9 @@ typedef struct PetFunctions
     Yield_f* Yield;
 
     Update_f* Update;
+
+    CreatePet_f* CreatePet;
+    PetEvent_f* PetEvent;
 } PetFunctions;
 
 PetStatus TAU_UTILS_LIB InitPetAI(const PetFunctions* const pFunctions);

@@ -33,6 +33,8 @@ public:
     PetStatus Yield(TimeMs_t* const pSleepTime) noexcept;
 
     PetStatus Update(const float deltaTime) noexcept;
+
+    PetStatus CreatePet(const CreatePetData* const pCreatePetData) noexcept;
 private:
     PetAICallbacks m_Callbacks;  // NOLINT(clang-diagnostic-unused-private-field)
 };
@@ -47,6 +49,8 @@ static PetStatus Sleep(const PetAppHandle petAppHandle, TimeMs_t* const pSleepTi
 static PetStatus Yield(const PetAppHandle petAppHandle, TimeMs_t* const pSleepTime);
 
 static PetStatus Update(const PetAppHandle petAppHandle, const float deltaTime);
+
+static PetStatus CreatePet(const PetAppHandle petAppHandle, const CreatePetData* const pCreatePetData);
 
 static ::std::atomic_bool s_ShouldExit(false);
 
@@ -66,6 +70,7 @@ int main(int argCount, char* args[])
     petFunctions.Sleep = Sleep;
     petFunctions.Yield = Yield;
     petFunctions.Update = Update;
+    petFunctions.CreatePet = CreatePet;
 
     PetStatus status = InitPetAI(&petFunctions);
 
@@ -207,6 +212,18 @@ PetStatus Win32CliPet::Update(const float deltaTime) noexcept
     return PetSuccess;
 }
 
+PetStatus Win32CliPet::CreatePet(const CreatePetData* const pCreatePetData) noexcept
+{
+    CreatePetAIData createData {};
+    createData.ParentMale = pCreatePetData->ParentMale;
+    createData.ParentFemale = pCreatePetData->ParentFemale;
+    createData.Gender = PetGenderNeuter;
+    createData.State = nullptr;
+    createData.StateSize = 0;
+
+    return m_Callbacks.CreatePet(m_Callbacks.Handle, &createData, nullptr);
+}
+
 static PetStatus CreatePetApp(PetAppHandle* const pOutPetAppHandle, const PetAICallbacks* const pPetAICallbacks)
 {
     if(!pOutPetAppHandle)
@@ -298,6 +315,18 @@ static PetStatus Update(const PetAppHandle petAppHandle, const float deltaTime)
     Win32CliPet* const pet = Win32CliPet::FromHandle(petAppHandle);
 
     return pet->Update(deltaTime);
+}
+
+PetStatus CreatePet(const PetAppHandle petAppHandle, const CreatePetData* const pCreatePetData)
+{
+    if(!petAppHandle.Ptr)
+    {
+        return PetInvalidArg;
+    }
+
+    Win32CliPet* const pet = Win32CliPet::FromHandle(petAppHandle);
+
+    return pet->CreatePet(pCreatePetData);
 }
 
 static BOOL WINAPI CtrlHandler(const DWORD fdwCtrlType) noexcept

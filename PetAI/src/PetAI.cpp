@@ -5,12 +5,16 @@
 #include <SysLib.h>
 #include <new>
 
-PetManager g_PetManager;
+#include "PetEntity.hpp"
 
-static bool s_ShouldExit = false;
+PetManager g_PetManager;
 
 // ReSharper disable once CppFunctionIsNotImplemented
 static PetStatus NotifyExit(const PetAIHandle petAIHandle);
+// ReSharper disable once CppFunctionIsNotImplemented
+static PetStatus GetPetState(const PetAIHandle petAIHandle, const PetHandle petHandle, void** const pState, uint32_t* const pSize);
+// ReSharper disable once CppFunctionIsNotImplemented
+static PetStatus CreatePet(const PetAIHandle petAIHandle, const CreatePetAIData* const pCreatePetData, PetHandle* const pPetHandle);
 
 extern "C" PetStatus InitPetAI(const PetFunctions* const pFunctions)
 {
@@ -30,7 +34,7 @@ extern "C" PetStatus InitPetAI(const PetFunctions* const pFunctions)
 
     g_PetManager.AppFunctions() = pFunctions;
     g_PetManager.AppHandle().Ptr = nullptr;
-    g_PetManager.PetCallbackHandle() = nullptr;
+    g_PetManager.PetCallbackHandle() = &g_PetManager;
 
     return PetSuccess;
 }
@@ -48,12 +52,14 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
     PetAICallbacks callbacks {};
     callbacks.Handle.Ptr = g_PetManager.PetCallbackHandle();
     callbacks.NotifyExit = NotifyExit;
+    callbacks.GetPetState = GetPetState;
+    callbacks.CreatePet = CreatePet;
 
     PetStatus status = g_PetManager.AppFunctions()->CreatePetApp(&g_PetManager.AppHandle(), &callbacks);
 
     if(!IsStatusSuccess(status))
     {
-        DebugPrintF(u8"[RunPetAI]: pFunctions->CreatePet returned status 0x%08X.\n", status);
+        DebugPrintF(u8"[RunPetAI]: pFunctions->CreatePetApp returned status 0x%08X.\n", status);
         return status;
     }
 
@@ -67,15 +73,23 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
 
     delete[] stateBuffer;
 
-    BlackboardKeyManager blackboardKeyManager;
-    InitBlackboardKeys(blackboardKeyManager);
+    InitBlackboardKeys(g_PetManager.BlackboardKeyManager());
 
-    Blackboard blackboard(blackboardKeyManager);
-    BehaviorTreeExecutor behaviorTreeExecutor(&g_RootNode, &blackboard, &g_PetManager);
+    CreatePetData initialPetData {};
+    initialPetData.ParentMale.Ptr = nullptr;
+    initialPetData.ParentFemale.Ptr = nullptr;
+
+    status = g_PetManager.AppFunctions()->CreatePet(g_PetManager.AppHandle(), &initialPetData);
+
+    if(!IsStatusSuccess(status))
+    {
+        DebugPrintF(u8"[RunPetAI]: pFunctions->CreatePet returned status 0x%08X.\n", status);
+        return status;
+    }
 
     TimeMs_t lastTime = GetCurrentTimeMs();
 
-    while(!s_ShouldExit)
+    while(!g_PetManager.ShouldExit())
     {
         const TimeMs_t currentTime = GetCurrentTimeMs();
 
@@ -86,12 +100,15 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
             g_PetManager.AppFunctions()->Update(g_PetManager.AppHandle(), deltaTime);
         }
 
-        if(s_ShouldExit)
+        if(g_PetManager.ShouldExit())
         {
             break;
         }
 
-        behaviorTreeExecutor.Tick(deltaTime);
+        for(PetEntity* pet : g_PetManager.Pets())
+        {
+            pet->BehaviorTreeExecutor().Tick(deltaTime);
+        }
 
         if(g_PetManager.AppFunctions()->Sleep)
         {
@@ -162,9 +179,30 @@ static PetStatus LoadState(const uint8_t** const ppBuffer) noexcept
 
 static PetStatus NotifyExit(const PetAIHandle petAIHandle)
 {
-    (void) petAIHandle;
+    if(!petAIHandle.Ptr)
+    {
+        return PetInvalidArg;
+    }
 
-    s_ShouldExit = true;
-    return PetSuccess;
+    return PetManager::FromHandle(petAIHandle)->NotifyExit();
 }
 
+static PetStatus GetPetState(const PetAIHandle petAIHandle, const PetHandle petHandle, void** const pState, uint32_t* const pSize)
+{
+    if(!petAIHandle.Ptr)
+    {
+        return PetInvalidArg;
+    }
+
+    return PetManager::FromHandle(petAIHandle)->GetPetState(petHandle, pState, pSize);
+}
+
+static PetStatus CreatePet(const PetAIHandle petAIHandle, const CreatePetAIData* const pCreatePetData, PetHandle* const pPetHandle)
+{
+    if(!petAIHandle.Ptr)
+    {
+        return PetInvalidArg;
+    }
+
+    return PetManager::FromHandle(petAIHandle)->CreatePet(pCreatePetData, pPetHandle);
+}
