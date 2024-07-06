@@ -13,6 +13,12 @@ extern "C" {
   #define USE_CHAR8_T (1)
 #endif
 
+#if USE_CHAR8_T
+  #define CSTR(X) u8##X
+#else
+  #define CSTR(X) X
+#endif
+
 /**
  * \brief Represents a timestamp in milliseconds.
  */
@@ -77,6 +83,12 @@ int StringCompare8(const char8_t* left, const char8_t* right);
 #endif
 
 void ZeroMem(void* data, const size_t length);
+
+void SeedRng(int seed);
+
+int GenerateRandomInt(int min, int max);
+
+float GenerateRandomFloat(float min, float max);
 
 #ifdef __cplusplus
 }
