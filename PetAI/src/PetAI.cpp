@@ -16,7 +16,7 @@ static PetStatus GetPetState(const PetAIHandle petAIHandle, const PetHandle petH
 // ReSharper disable once CppFunctionIsNotImplemented
 static PetStatus CreatePet(const PetAIHandle petAIHandle, const CreatePetAIData* const pCreatePetData, PetHandle* const pPetHandle);
 
-extern "C" PetStatus InitPetAI(const PetFunctions* const pFunctions)
+extern "C" PetStatus TAU_UTILS_LIB InitPetAI(const PetFunctions* const pFunctions)
 {
     InitSys();
 
@@ -37,6 +37,11 @@ extern "C" PetStatus InitPetAI(const PetFunctions* const pFunctions)
     g_PetManager.PetCallbackHandle() = &g_PetManager;
 
     return PetSuccess;
+}
+
+extern "C" void TAU_UTILS_LIB CleanupPetAI()
+{
+    DestroySys();
 }
 
 // ReSharper disable once CppFunctionIsNotImplemented

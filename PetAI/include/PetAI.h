@@ -268,6 +268,8 @@ typedef struct PetFunctions
 
 PetStatus TAU_UTILS_LIB InitPetAI(const PetFunctions* const pFunctions);
 
+void TAU_UTILS_LIB CleanupPetAI();
+
 PetStatus TAU_UTILS_LIB RunPetAI();
 
 #ifdef __cplusplus

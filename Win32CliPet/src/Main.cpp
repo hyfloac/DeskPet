@@ -81,10 +81,13 @@ int main(int argCount, char* args[])
 
     if(!SetConsoleCtrlHandler(CtrlHandler, TRUE))
     {
+        CleanupPetAI();
         return -3;
     }
 
     status = RunPetAI();
+
+    CleanupPetAI();
 
     if(!IsStatusSuccess(status))
     {
