@@ -198,6 +198,7 @@ typedef PetStatus CreatePet_f(PetAppHandle petAppHandle, const CreatePetData* pC
 typedef enum PetEventType
 {
     Unknown = 0,
+    Birth = 1
 } PetEventType;
 
 typedef struct PetEventBirth

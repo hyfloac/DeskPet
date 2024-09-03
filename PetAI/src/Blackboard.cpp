@@ -182,6 +182,12 @@ Blackboard::Blackboard(const BlackboardKeyManager& keyManager) noexcept
     keyManager.NameTree().Iterate<Blackboard, decltype(&Blackboard::AddOffsetsCallback), IteratorMethod::LowestToHighest>(this, &Blackboard::AddOffsetsCallback);
 }
 
+Blackboard::~Blackboard() noexcept
+{
+    Free(m_KeyOffsets);
+    Free(m_BlackboardData);
+}
+
 void Blackboard::CountKeyCallback(const BlackboardKeyManager::TreeT::Node* node) noexcept
 {
     ++m_KeyCount;

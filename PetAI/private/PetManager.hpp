@@ -11,7 +11,6 @@ class PetEntity;
 
 class PetManager final
 {
-    DEFAULT_CONSTRUCT_PU(PetManager);
     DEFAULT_DESTRUCT(PetManager);
     DELETE_CM(PetManager);
 public:
@@ -22,6 +21,8 @@ public:
 public:
     using PetArray = ::std::vector<PetEntity*>;
 public:
+    PetManager() noexcept;
+
     [[nodiscard]] const PetFunctions*&        AppFunctions()       noexcept { return m_AppFunctions; }
     [[nodiscard]] const PetFunctions* const & AppFunctions() const noexcept { return m_AppFunctions; }
 

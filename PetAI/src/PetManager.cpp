@@ -3,6 +3,15 @@
 #include "PetBehaviors.hpp"
 #include <new>
 
+PetManager::PetManager() noexcept
+    : m_AppFunctions(nullptr)
+    , m_AppHandle { nullptr }
+    , m_PetCallbackHandle(nullptr)
+    , m_BlackboardKeyManager()
+    , m_ShouldExit(false)
+    , m_Pets()
+{ }
+
 PetStatus PetManager::NotifyExit() noexcept
 {
     m_ShouldExit = true;

@@ -24,6 +24,7 @@ public:
     ) noexcept
         : m_ParentMale(nullptr)
         , m_ParentFemale(nullptr)
+        , m_Gender(PetGenderNeuter)
         , m_State(state)
         , m_StateSize(stateSize)
         , m_Blackboard(keyManager)

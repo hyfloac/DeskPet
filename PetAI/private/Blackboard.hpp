@@ -116,6 +116,8 @@ class Blackboard final
 public:
     Blackboard(const BlackboardKeyManager& keyManager) noexcept;
 
+    ~Blackboard() noexcept;
+
     template<typename T>
     [[nodiscard]] T* GetT(const BlackboardKey key) noexcept
     {
