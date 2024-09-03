@@ -115,6 +115,63 @@ private:
     friend class FileBlock;
 };
 
+class FileReader final
+{
+    DELETE_CM(FileReader);
+public:
+    static inline constexpr size_t InvalidFileOffset = ::std::numeric_limits<size_t>::max();
+public:
+    static PetStatus OpenFile(
+        PetManager& petManager, 
+        FileReader* const pFileReader, 
+        const PetFileHandle fileHandle, 
+        const uint32_t targetBlockSize = 4096
+    ) noexcept;
+private:
+    FileReader(
+        PetManager& petManager, 
+        const PetFileHandle fileHandle, 
+        const uint32_t targetBlockSize
+    ) noexcept
+        : m_PetManager(&petManager)
+        , m_FileHandle(fileHandle)
+        , m_TargetBlockSize(targetBlockSize)
+        , m_FileLength(0)
+        , m_DataBlock(nullptr)
+        , m_DataBlockSize(0)
+        , m_DataBlockOffset(0)
+        , m_FileOffset(0)
+    { }
+public:
+    FileReader() noexcept
+        : m_FileHandle(0)
+        , m_TargetBlockSize(0)
+        , m_FileLength(0)
+        , m_DataBlock(nullptr)
+        , m_DataBlockSize(0)
+        , m_FileOffset(0)
+    { }
+
+    ~FileReader() noexcept;
+
+    PetStatus ReadBytes(const size_t offset, void* const data, size_t* const pSize) noexcept;
+private:
+    PetStatus Init() noexcept;
+private:
+    PetManager* m_PetManager;
+    PetFileHandle m_FileHandle;
+    /**
+     * The target size of the data block.
+     * This is how much to read in at any given time.
+     */
+    size_t m_TargetBlockSize;
+
+    size_t m_FileLength;
+    uint8_t* m_DataBlock;
+    size_t m_DataBlockSize;
+    size_t m_FileOffset;
+};
+
 #pragma pack(push, 1)
 struct BlackboardKeyFileBaseHeader final
 {
@@ -132,7 +189,6 @@ struct BlackboardKeyFileBaseHeader final
 
 class BlackboardKeyLoader final
 {
-    DEFAULT_DESTRUCT(BlackboardKeyLoader);
     DELETE_CM(BlackboardKeyLoader);
 public:
     static inline constexpr char FileMagic[4] = { 'B', 'l', 'k', 'K' };
@@ -141,10 +197,11 @@ public:
     static inline constexpr uint16_t FileVersion1_0 = FileUtils::MakeVersion(1, 0);
 public:
     BlackboardKeyLoader() noexcept
-        : m_FileLength(0)
+        : m_TargetBlockSize(4096)
+        , m_FileLength(0)
         , m_DataBlock(nullptr)
-        , m_CurrentOffset(0)
-        , m_Length(0)
+        , m_DataBlockSize(0)
+        , m_DataBlockOffset(0)
         , m_FileOffset(0)
         , m_StringBlock(nullptr)
         , m_CurrentStringOffset(0)
@@ -153,14 +210,27 @@ public:
         , m_BaseHeader{}
     { }
 
+    ~BlackboardKeyLoader() noexcept;
+
+    [[nodiscard]] size_t& TargetBlockSize()       noexcept { return m_TargetBlockSize; }
+    [[nodiscard]] size_t  TargetBlockSize() const noexcept { return m_TargetBlockSize; }
+
     PetStatus Load(BlackboardKeyManager& keyManager, PetManager& petManager) noexcept;
 private:
     PetStatus LoadV1_0(BlackboardKeyManager& keyManager, PetManager& petManager) noexcept;
+
+    static void FlipEndian(BlackboardKeyFileBaseHeader& baseHeader) noexcept;
 private:
+    /**
+     * The target size of the data block.
+     * This is how much to read in at any given time.
+     */
+    size_t m_TargetBlockSize;
+
     size_t m_FileLength;
     uint8_t* m_DataBlock;
-    uint32_t m_CurrentOffset;
-    size_t m_Length;
+    size_t m_DataBlockSize;
+    uint32_t m_DataBlockOffset;
     size_t m_FileOffset;
     uint8_t* m_StringBlock;
     uint32_t m_CurrentStringOffset;

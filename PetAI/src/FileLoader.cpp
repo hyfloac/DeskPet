@@ -2,6 +2,7 @@
 #include <cstring>
 #include <algorithm>
 #include <iterator>
+#include <limits>
 
 template<typename T>
 void FileUtils::FlipEndian(T& val) noexcept
@@ -25,6 +26,180 @@ FileBlockHandle FileBlock::Acquire(uint8_t*& receivingBlock) noexcept
     return FileBlockHandle(*this, receivingBlock);
 }
 
+FileReader::~FileReader() noexcept
+{
+    if(m_DataBlock)
+    {
+        delete[] m_DataBlock;
+        m_DataBlock = nullptr;
+        m_DataBlockSize = 0;
+    }
+}
+
+PetStatus FileReader::OpenFile(
+    PetManager& petManager, 
+    FileReader* const pFileReader, 
+    const PetFileHandle fileHandle, 
+    const uint32_t targetBlockSize
+) noexcept
+{
+    if(!pFileReader)
+    {
+        return PetInvalidArg;
+    }
+
+    if(fileHandle == 0)
+    {
+        return PetInvalidArg;
+    }
+
+    if(targetBlockSize == 0)
+    {
+        return PetInvalidArg;
+    }
+
+    pFileReader->~FileReader();
+
+    ::new(pFileReader) FileReader(
+        petManager, 
+        fileHandle, 
+        targetBlockSize
+    );
+
+    const PetStatus status = pFileReader->Init();
+
+    if(!IsStatusSuccess(status))
+    {
+        pFileReader->~FileReader();
+        return status;
+    }
+
+    return PetSuccess;
+}
+
+PetStatus FileReader::Init() noexcept
+{
+    m_FileLength = 0;
+    m_FileOffset = InvalidFileOffset;
+
+    PetStatus status = m_PetManager->AppFunctions()->LoadPetState(m_PetManager->AppHandle(), BlackboardKeyFileHandle, 0, nullptr, &m_FileLength);
+
+    if(!IsStatusSuccess(status))
+    {
+        if(status == PetInvalidArg)
+        {
+            return PetFail;
+        }
+
+        return status;
+    }
+
+    // If the size of the file is smaller than the data block size, just allocate enough for the file.
+    m_TargetBlockSize = ::std::min(m_FileLength, m_TargetBlockSize);
+
+    m_DataBlockSize = m_TargetBlockSize;
+
+    m_DataBlock = new uint8_t[m_DataBlockSize];
+
+    return PetSuccess;
+}
+
+PetStatus FileReader::ReadBytes(const size_t offset, void* const data, size_t* const pSize) noexcept
+{
+    if(!pSize)
+    {
+        return PetInvalidArg;
+    }
+
+    if(offset + *pSize > m_FileLength)
+    {
+        return PetInvalidArg;
+    }
+
+    if(!data)
+    {
+        return PetInvalidArg;
+    }
+
+    PetStatus status = PetSuccess;
+
+    // Do we need to read in a new block?
+    if(m_FileOffset == InvalidFileOffset || offset < m_FileOffset || offset > m_FileOffset + m_DataBlockSize)
+    {
+        m_DataBlockSize = m_TargetBlockSize;
+        status = m_PetManager->AppFunctions()->LoadPetState(m_PetManager->AppHandle(), BlackboardKeyFileHandle, offset, m_DataBlock, &m_DataBlockSize);
+
+        if(!IsStatusSuccess(status))
+        {
+            if(status == PetInvalidArg)
+            {
+                return PetFail;
+            }
+
+            return status;
+        }
+
+        m_FileOffset = offset;
+    }
+
+    size_t blockOffset = offset - m_FileOffset;
+
+    // If the size is smaller than our block, then we can just trivially copy it.
+    if(blockOffset + *pSize < m_DataBlockSize)
+    {
+        (void) ::std::memcpy(data, m_DataBlock + blockOffset, *pSize);
+
+        return PetSuccess;
+    }
+
+    size_t sizeRemaining = *pSize;
+    size_t dataOffset = 0;
+    size_t readSize = m_DataBlockSize - blockOffset;
+    //   This is used to indicate that we can no longer read more of the
+    // file.
+    //   We will carry around to the next loop iteration, and exit after we
+    // copy from the data block;
+    bool exitNext = false;
+
+    while(sizeRemaining > 0)
+    {
+        (void) ::std::memcpy(data + dataOffset, m_DataBlock + blockOffset, readSize);
+
+        sizeRemaining -= readSize;
+        dataOffset += readSize;
+
+        if(exitNext)
+        {
+            *pSize -= sizeRemaining;
+        }
+
+        m_FileOffset += m_DataBlockSize;
+
+        m_DataBlockSize = m_TargetBlockSize;
+        status = m_PetManager->AppFunctions()->LoadPetState(m_PetManager->AppHandle(), BlackboardKeyFileHandle, m_FileOffset, m_DataBlock, &m_DataBlockSize);
+
+        if(!IsStatusSuccess(status))
+        {
+            if(status == PetInvalidArg)
+            {
+                return PetFail;
+            }
+
+            return status;
+        }
+
+        blockOffset = 0;
+        readSize = m_DataBlockSize;
+
+        if(m_DataBlockSize < m_TargetBlockSize)
+        {
+            exitNext = true;
+        }
+    }
+
+    return PetSuccess;
+}
+
 static FileBlock BlackboardKeyBlock;
 static FileBlock BlackboardKeyStringBlock;
 
@@ -36,6 +211,16 @@ struct BlackboardKeyIndice final
     uint32_t NameOffset;
 };
 #pragma pack(pop)
+
+BlackboardKeyLoader::~BlackboardKeyLoader() noexcept
+{
+    if(m_DataBlock)
+    {
+        delete[] m_DataBlock;
+        m_DataBlock = nullptr;
+        m_DataBlockSize = 0;
+    }
+}
 
 PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager& petManager) noexcept
 {
@@ -52,9 +237,7 @@ PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager
     }
 
     m_FileLength = 0;
-    m_CurrentOffset = 0;
     m_FileOffset = 0;
-    m_Length = 0;
 
     PetStatus status = petManager.AppFunctions()->LoadPetState(petManager.AppHandle(), BlackboardKeyFileHandle, 0, nullptr, &m_FileLength);
 
@@ -68,7 +251,21 @@ PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager
         return status;
     }
 
-    status = petManager.AppFunctions()->LoadPetState(petManager.AppHandle(), BlackboardKeyFileHandle, m_FileOffset, m_DataBlock, &m_Length);
+    // If the size of the file is smaller than the data block size, just allocate enough for the file.
+    const size_t newDataBlockSize = ::std::min(m_FileLength, m_TargetBlockSize);
+
+    // If the new block size is smaller than our existing block, don't bother making it bigger.
+    if(newDataBlockSize > m_DataBlockSize)
+    {
+        delete[] m_DataBlock;
+
+        m_DataBlock = new uint8_t[m_DataBlockSize];
+        m_DataBlockSize = newDataBlockSize;
+    }
+
+    size_t length = m_DataBlockSize;
+
+    status = petManager.AppFunctions()->LoadPetState(petManager.AppHandle(), BlackboardKeyFileHandle, m_FileOffset, m_DataBlock, &length);
 
     if(!IsStatusSuccess(status))
     {
@@ -80,16 +277,16 @@ PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager
         return status;
     }
 
-    m_FileOffset += m_Length;
+    m_FileOffset += length;
 
-    if(m_Length < sizeof(BlackboardKeyFileBaseHeader))
+    if(length < sizeof(BlackboardKeyFileBaseHeader))
     {
         return PetFail;
     }
 
     BlackboardKeyFileBaseHeader* const baseHeader = reinterpret_cast<BlackboardKeyFileBaseHeader*>(m_DataBlock);
 
-    m_CurrentOffset += sizeof(BlackboardKeyFileBaseHeader);
+    m_DataBlockOffset += sizeof(BlackboardKeyFileBaseHeader);
 
     if(baseHeader->Magic[0] != FileMagic[0] ||
        baseHeader->Magic[1] != FileMagic[1] ||
@@ -106,20 +303,7 @@ PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager
             return PetFail;
         }
 
-        FileUtils::FlipEndian(baseHeader->Version);
-        FileUtils::FlipEndian(baseHeader->MinVersion);
-        FileUtils::FlipEndian(baseHeader->Reserved[0]);
-        FileUtils::FlipEndian(baseHeader->Reserved[1]);
-        FileUtils::FlipEndian(baseHeader->Reserved[2]);
-        FileUtils::FlipEndian(baseHeader->Reserved[3]);
-        FileUtils::FlipEndian(baseHeader->Reserved[4]);
-        FileUtils::FlipEndian(baseHeader->Reserved[5]);
-        FileUtils::FlipEndian(baseHeader->Reserved[6]);
-        FileUtils::FlipEndian(baseHeader->Reserved[7]);
-        FileUtils::FlipEndian(baseHeader->KeyCount);
-        FileUtils::FlipEndian(baseHeader->NextHeaderOffset);
-        FileUtils::FlipEndian(baseHeader->KeyIndicesOffset);
-        FileUtils::FlipEndian(baseHeader->StringBlobOffset);
+        FlipEndian(*baseHeader);
     }
 
     m_BaseHeader = *baseHeader;
@@ -149,4 +333,22 @@ PetStatus BlackboardKeyLoader::LoadV1_0(BlackboardKeyManager& keyManager, PetMan
     }
 
     return PetSuccess;
+}
+
+void BlackboardKeyLoader::FlipEndian(BlackboardKeyFileBaseHeader& baseHeader) noexcept
+{
+    FileUtils::FlipEndian(baseHeader.Version);
+    FileUtils::FlipEndian(baseHeader.MinVersion);
+    FileUtils::FlipEndian(baseHeader.Reserved[0]);
+    FileUtils::FlipEndian(baseHeader.Reserved[1]);
+    FileUtils::FlipEndian(baseHeader.Reserved[2]);
+    FileUtils::FlipEndian(baseHeader.Reserved[3]);
+    FileUtils::FlipEndian(baseHeader.Reserved[4]);
+    FileUtils::FlipEndian(baseHeader.Reserved[5]);
+    FileUtils::FlipEndian(baseHeader.Reserved[6]);
+    FileUtils::FlipEndian(baseHeader.Reserved[7]);
+    FileUtils::FlipEndian(baseHeader.KeyCount);
+    FileUtils::FlipEndian(baseHeader.NextHeaderOffset);
+    FileUtils::FlipEndian(baseHeader.KeyIndicesOffset);
+    FileUtils::FlipEndian(baseHeader.StringBlobOffset);
 }
