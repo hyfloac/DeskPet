@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.23)
-project(Win32CliPet VERSION 0.0.1 LANGUAGES CXX C)
+project(CliPet VERSION 0.0.1 LANGUAGES CXX C)
 
 # Used to disable some warnings.
 include(CheckCCompilerFlag)
@@ -15,10 +15,10 @@ file(GLOB HEADERS_BASE "include/*.hpp" "include/*.h" "include/*.inl")
 
 # Store all of the required files in a variable. 
 # This is mostly for shared/static libraries.
-set(WIN32CLIPET_SOURCE_FILES ${SOURCES_BASE} ${HEADERS_BASE})
+set(CLIPET_SOURCE_FILES ${SOURCES_BASE} ${HEADERS_BASE})
 
 # Setup the executable with the source files.
-add_executable(${PROJECT_NAME} ${WIN32CLIPET_SOURCE_FILES})
+add_executable(${PROJECT_NAME} ${CLIPET_SOURCE_FILES})
 
 # Create a "folder" for the headers in Visual Studio
 foreach(_source IN ITEMS ${HEADERS})

@@ -3,7 +3,7 @@ project(DeskPet VERSION 0.0.1 LANGUAGES CXX C)
 
 add_subdirectory(SysLib)
 add_subdirectory(PetAI)
-add_subdirectory(Win32CliPet)
+add_subdirectory(CliPet)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib")

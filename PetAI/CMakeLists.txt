@@ -61,9 +61,9 @@ target_sources("${PROJECT_NAME}Static" PUBLIC FILE_SET "HEADERS" BASE_DIRS "incl
 target_sources("${PROJECT_NAME}Shared" PRIVATE FILE_SET "headers_private_${PROJECT_NAME}" TYPE "HEADERS" BASE_DIRS "private" FILES ${PRIVATE_HEADERS})
 target_sources("${PROJECT_NAME}Static" PRIVATE FILE_SET "headers_private_${PROJECT_NAME}" TYPE "HEADERS" BASE_DIRS "private" FILES ${PRIVATE_HEADERS})
 
-# Copy the DLL for the PetAI to the output directory of Win32CliPet.
-add_custom_command(TARGET ${PROJECT_NAME}Shared POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${PROJECT_NAME}Shared> $<TARGET_FILE_DIR:Win32CliPet>)
-# add_custom_command(TARGET ${PROJECT_NAME}Shared POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_LINKER_FILE:${PROJECT_NAME}Shared> $<TARGET_FILE_DIR:Win32CliPet>)
+# Copy the DLL for the PetAI to the output directory of CliPet.
+add_custom_command(TARGET ${PROJECT_NAME}Shared POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${PROJECT_NAME}Shared> $<TARGET_FILE_DIR:CliPet>)
+# add_custom_command(TARGET ${PROJECT_NAME}Shared POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_LINKER_FILE:${PROJECT_NAME}Shared> $<TARGET_FILE_DIR:CliPet>)
 
 # Link the required libraries.
 target_link_libraries("${PROJECT_NAME}Shared" SysLib)

@@ -1,3 +1,4 @@
+#ifdef _WIN32
 #include <PetAI.h>
 #include <new>
 #include <cstdlib>
@@ -343,3 +344,4 @@ static BOOL WINAPI CtrlHandler(const DWORD fdwCtrlType) noexcept
         default: return FALSE;
     }
 }
+#endif
