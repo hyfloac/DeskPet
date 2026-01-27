@@ -163,7 +163,7 @@ PetStatus FileReader::ReadBytes(const size_t offset, void* const data, size_t* c
 
     while(sizeRemaining > 0)
     {
-        (void) ::std::memcpy(data + dataOffset, m_DataBlock + blockOffset, readSize);
+        (void) ::std::memcpy(static_cast<uint8_t*>(data) + dataOffset, m_DataBlock + blockOffset, readSize);
 
         sizeRemaining -= readSize;
         dataOffset += readSize;
