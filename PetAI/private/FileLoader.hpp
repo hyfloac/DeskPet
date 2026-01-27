@@ -139,7 +139,7 @@ private:
         , m_FileLength(0)
         , m_DataBlock(nullptr)
         , m_DataBlockSize(0)
-        , m_DataBlockOffset(0)
+        // , m_DataBlockOffset(0)
         , m_FileOffset(0)
     { }
 public:
@@ -148,7 +148,7 @@ public:
         , m_TargetBlockSize(0)
         , m_FileLength(0)
         , m_DataBlock(nullptr)
-        , m_DataBlockSize(0)
+        // , m_DataBlockSize(0)
         , m_FileOffset(0)
     { }
 
