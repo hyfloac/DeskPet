@@ -59,6 +59,8 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
     callbacks.NotifyExit = NotifyExit;
     callbacks.GetPetState = GetPetState;
     callbacks.CreatePet = CreatePet;
+    callbacks.CreateDefaultRenderer = nullptr;
+    callbacks.DestroyDefaultRenderer = nullptr;
 
     PetStatus status = g_PetManager.AppFunctions()->CreatePetApp(&g_PetManager.AppHandle(), &callbacks);
 

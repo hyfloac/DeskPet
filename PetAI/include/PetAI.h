@@ -18,7 +18,7 @@ extern "C" {
 #ifdef __cplusplus
   #ifdef _MSVC_LANG
     #define CPP_VERSION_DATE _MSVC_LANG
-  #else 
+  #else
     #define CPP_VERSION_DATE __cplusplus
   #endif
 #elif defined(_MSVC_LANG)
@@ -100,6 +100,10 @@ typedef struct PetHandle {
     void* Ptr;
 } PetHandle;
 
+typedef struct PetRendererHandle {
+    void* Ptr;
+} PetRendererHandle;
+
 struct PetAICallbacks;
 
 /**
@@ -157,10 +161,10 @@ typedef PetStatus LoadPetState_f(PetAppHandle petAppHandle, PetFileHandle file, 
  * time, and it does not need to report how long it actually slept for,
  * though this might cause some slippage in how long a task was
  * supposed to take.
- * 
+ *
  * @param petAppHandle The state object of the application.
  * @param pSleepTime A pointer to how much time to sleep, and to store
- *   how much time was actually slept. 
+ *   how much time was actually slept.
  * @return A status code.
  */
 typedef PetStatus Sleep_f(PetAppHandle petAppHandle, TimeMs_t* pSleepTime);
@@ -173,9 +177,9 @@ typedef PetStatus Sleep_f(PetAppHandle petAppHandle, TimeMs_t* pSleepTime);
  *   The application does not need to report how long it actually slept
  * for, though this might cause some slippage in how long a task was
  * supposed to take.
- * 
+ *
  * @param petAppHandle The state object of the application.
- * @param pSleepTime A to store how much time was slept. 
+ * @param pSleepTime A to store how much time was slept.
  * @return A status code.
  */
 typedef PetStatus Yield_f(PetAppHandle petAppHandle, TimeMs_t* pSleepTime);
@@ -225,6 +229,49 @@ typedef struct PetEventData
 
 typedef PetStatus PetEvent_f(PetAppHandle petAppHandle, const PetEventData* pPetEventData);
 
+typedef PetStatus GetScreenSize_f(PetRendererHandle rendererHandle, uint16_t* pWidth, uint16_t* pHeight);
+
+typedef struct ScreenPoint
+{
+    uint16_t X;
+    uint16_t Y;
+} ScreenPoint;
+
+typedef struct RGBColor
+{
+    uint8_t R;
+    uint8_t G;
+    uint8_t B;
+} RGBColor;
+
+typedef struct DrawRectData
+{
+    ScreenPoint Points[2];
+    uint16_t Depth;
+    RGBColor Color;
+} DrawRectData;
+
+typedef PetStatus DrawRectangle_f(PetRendererHandle rendererHandle, const DrawRectData* pDrawData);
+
+typedef struct DrawTriangleData
+{
+    ScreenPoint Points[3];
+    uint16_t Depth;
+    RGBColor Color;
+} DrawTriangleData;
+
+typedef PetStatus DrawTriangle_f(PetRendererHandle rendererHandle, const DrawTriangleData* pDrawData);
+
+typedef struct PetRendererFunctions
+{
+    GetScreenSize_f* GetScreenSize;
+    DrawRectangle_f* DrawRectangle;
+    DrawTriangle_f* DrawTriangle;
+} PetRendererFunctions;
+
+typedef PetStatus CreateRenderer_f(PetAppHandle petAppHandle, PetRendererHandle* pOutRendererHandle, PetRendererFunctions* pOutRendererFunctions);
+typedef PetStatus DestroyRenderer_f(PetAppHandle petAppHandle, PetRendererHandle rendererHandle);
+
 typedef PetStatus NotifyExit_f(PetAIHandle petAIHandle);
 typedef PetStatus EnumPets_f(PetAIHandle petAIHandle, PetHandle* pPetHandle, uint32_t index);
 
@@ -241,6 +288,9 @@ typedef struct CreatePetAIData
 
 typedef PetStatus CreatePetAI_f(PetAIHandle petAIHandle, const CreatePetAIData* pCreatePetData, PetHandle* pPetHandle);
 
+typedef PetStatus CreateDefaultRenderer_f(PetAIHandle petAIHandle, PetRendererHandle* pOutRendererHandle, PetRendererFunctions* pOutRendererFunctions);
+typedef PetStatus DestroyDefaultRenderer_f(PetAIHandle petAIHandle, PetRendererHandle rendererHandle);
+
 typedef struct PetAICallbacks
 {
     PetAIHandle Handle;
@@ -248,6 +298,8 @@ typedef struct PetAICallbacks
     EnumPets_f* EnumPets;
     GetPetState_f* GetPetState;
     CreatePetAI_f* CreatePet;
+    CreateDefaultRenderer_f* CreateDefaultRenderer;
+    DestroyDefaultRenderer_f* DestroyDefaultRenderer;
 } PetAICallbacks;
 
 typedef struct PetFunctions
@@ -267,6 +319,9 @@ typedef struct PetFunctions
 
     CreatePet_f* CreatePet;
     PetEvent_f* PetEvent;
+
+    CreateRenderer_f* CreateRenderer;
+    DestroyRenderer_f* DestroyRenderer;
 } PetFunctions;
 
 PetStatus TAU_UTILS_LIB InitPetAI(const PetFunctions* const pFunctions);
