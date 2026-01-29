@@ -19,7 +19,10 @@ class DeskPetRecipe(ConanFile):
     default_options = { "shared": False }
 
     # Sources are located in the same place as this recipe, copy them to the recipe
-    exports_sources = "CMakeLists.txt", "SysLib/*", "PetAI/*"
+    exports_sources = "CMakeLists.txt", "SysLib/*", "SysLib/tests", "PetAI/*"
+
+    def requirements(self):
+        self.requires("gtest/1.17.0")
 
     def set_version(self):
         self.version = self.conan_data["latest"];

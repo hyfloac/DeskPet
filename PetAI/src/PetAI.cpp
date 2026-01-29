@@ -124,7 +124,6 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
         lastTime = currentTime;
     }
 
-
     status = g_PetManager.AppFunctions()->DestroyPetApp(g_PetManager.AppHandle());
 
     if(!IsStatusSuccess(status))
