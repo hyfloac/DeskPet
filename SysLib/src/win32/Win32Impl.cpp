@@ -1,9 +1,11 @@
-#ifdef _WIN32
+#if defined(_WIN32)
 
 #include "SysLib.h"
+#include "CPPBase.hpp"
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <cstdio>
+#include <cstring>
 #include <new>
 #include <varargs.h>
 #include <cmath>
@@ -27,10 +29,6 @@ static DWORD OriginalConsoleErrorMode = 0;
    (ENABLE_PROCESSED_OUTPUT | \
     ENABLE_WRAP_AT_EOL_OUTPUT | \
     ENABLE_VIRTUAL_TERMINAL_PROCESSING)
-
-static uint32_t Crc32Table[256];
-
-static void GenerateCRC32Table() noexcept;
 
 extern "C" {
 
@@ -58,7 +56,7 @@ int InitSys(void)
     // Set our error console mode.
     (void) SetConsoleMode(OriginalConsoleErrorHandle, CONSOLE_OUT_DEFAULT_ARGS);
 
-    GenerateCRC32Table();
+    internal_GenerateCRC32Table();
 
     return 0;
 }
@@ -155,18 +153,9 @@ void DebugPrintF(const PrintChar_t* fmt, ...)
     Free(wideBuffer);
 }
 
-
 uint32_t UpdateCRC32(const uint32_t initialCrc, const void* const data, const size_t length)
 {
-    uint32_t crc32 = initialCrc ^ 0xFFFFFFFF;
-    const uint8_t* const dataBytes = static_cast<const uint8_t*>(data);
-
-    for(size_t i = 0; i < length; ++i)
-    {
-        crc32 = Crc32Table[(crc32 ^ dataBytes[i]) & 0xFF] ^ (crc32 >> 8);
-    }
-
-    return crc32 ^ 0xFFFFFFFF;
+    return internal_UpdateCRC32(initialCrc, data, length);
 }
 
 size_t StringLengthC(const char* const string)
@@ -198,67 +187,21 @@ void ZeroMem(void* data, const size_t length)
     (void) memset(data, 0, length);
 }
 
-static unsigned int s_seed = 0;
-
 void SeedRng(const int seed)
 {
-    s_seed = seed;
-}
-
-// Compute a pseudorandom integer.
-// Output value in range [0, 32767]
-static int fast_rand()
-{
-    s_seed = (214013 * s_seed + 2531011);
-    return static_cast<int>((s_seed >> 16) & 0x7FFF);
+    internal_SeedRng(seed);
 }
 
 int GenerateRandomInt(const int min, const int max)
 {
-    int rand = fast_rand();
-
-    if(::std::abs(max - min) >= 32768)
-    {
-        rand |= fast_rand() << 16;
-    }
-
-    return rand % ::std::abs(max - min + 1) + min;
+    return internal_GenerateRandomInt(min, max);
 }
 
 float GenerateRandomFloat(const float min, const float max)
 {
-    constexpr int maxValue = 0x3FFFFFFF;
-    const int rand = fast_rand() << 15 | fast_rand();
-
-    const float randF = static_cast<float>(rand) / static_cast<float>(maxValue);
-
-    return (randF * (max - min + 1)) + min;
+    return internal_GenerateRandomFloat(min, max);
 }
 
-
-}
-
-static void GenerateCRC32Table() noexcept
-{
-    constexpr uint32_t polynomial = 0xEDB88320;
-
-    for(uint32_t i = 0; i < 256; ++i)
-    {
-        uint32_t c = i;
-        for(size_t j = 0; j < 8; ++j)
-        {
-            if((c & 1) == 1)
-            {
-                c = polynomial ^ (c >> 1);
-            }
-            else
-            {
-                c >>= 1;
-            }
-        }
-
-        Crc32Table[i] = c;
-    }
 }
 
 #endif
