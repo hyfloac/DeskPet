@@ -82,7 +82,7 @@ PetStatus FileReader::Init() noexcept
     m_FileLength = 0;
     m_FileOffset = InvalidFileOffset;
 
-    PetStatus status = m_PetManager->AppFunctions()->LoadPetState(m_PetManager->AppHandle(), BlackboardKeyFileHandle, 0, nullptr, &m_FileLength);
+    PetStatus status = m_PetManager->AppFunctions().LoadPetState(m_PetManager->AppHandle(), BlackboardKeyFileHandle, 0, nullptr, &m_FileLength);
 
     if(!IsStatusSuccess(status))
     {
@@ -127,7 +127,7 @@ PetStatus FileReader::ReadBytes(const size_t offset, void* const data, size_t* c
     if(m_FileOffset == InvalidFileOffset || offset < m_FileOffset || offset > m_FileOffset + m_DataBlockSize)
     {
         m_DataBlockSize = m_TargetBlockSize;
-        status = m_PetManager->AppFunctions()->LoadPetState(m_PetManager->AppHandle(), BlackboardKeyFileHandle, offset, m_DataBlock, &m_DataBlockSize);
+        status = m_PetManager->AppFunctions().LoadPetState(m_PetManager->AppHandle(), BlackboardKeyFileHandle, offset, m_DataBlock, &m_DataBlockSize);
 
         if(!IsStatusSuccess(status))
         {
@@ -176,7 +176,7 @@ PetStatus FileReader::ReadBytes(const size_t offset, void* const data, size_t* c
         m_FileOffset += m_DataBlockSize;
 
         m_DataBlockSize = m_TargetBlockSize;
-        status = m_PetManager->AppFunctions()->LoadPetState(m_PetManager->AppHandle(), BlackboardKeyFileHandle, m_FileOffset, m_DataBlock, &m_DataBlockSize);
+        status = m_PetManager->AppFunctions().LoadPetState(m_PetManager->AppHandle(), BlackboardKeyFileHandle, m_FileOffset, m_DataBlock, &m_DataBlockSize);
 
         if(!IsStatusSuccess(status))
         {
@@ -224,7 +224,7 @@ BlackboardKeyLoader::~BlackboardKeyLoader() noexcept
 
 PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager& petManager) noexcept
 {
-    if(!petManager.AppFunctions()->LoadPetState)
+    if(!petManager.AppFunctions().LoadPetState)
     {
         return PetSuccess;
     }
@@ -239,7 +239,7 @@ PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager
     m_FileLength = 0;
     m_FileOffset = 0;
 
-    PetStatus status = petManager.AppFunctions()->LoadPetState(petManager.AppHandle(), BlackboardKeyFileHandle, 0, nullptr, &m_FileLength);
+    PetStatus status = petManager.AppFunctions().LoadPetState(petManager.AppHandle(), BlackboardKeyFileHandle, 0, nullptr, &m_FileLength);
 
     if(!IsStatusSuccess(status))
     {
@@ -265,7 +265,7 @@ PetStatus BlackboardKeyLoader::Load(BlackboardKeyManager& keyManager, PetManager
 
     size_t length = m_DataBlockSize;
 
-    status = petManager.AppFunctions()->LoadPetState(petManager.AppHandle(), BlackboardKeyFileHandle, m_FileOffset, m_DataBlock, &length);
+    status = petManager.AppFunctions().LoadPetState(petManager.AppHandle(), BlackboardKeyFileHandle, m_FileOffset, m_DataBlock, &length);
 
     if(!IsStatusSuccess(status))
     {

@@ -62,6 +62,7 @@ typedef uint32_t PetStatus;
 #define PetFail (0xC0000001u)
 #define PetInvalidArg (0xC0000002u)
 #define PetNotImplemented (0xC0000003u)
+#define PetOutOfMemory (0xC0000004u)
 #else
 typedef enum PetStatuses : uint32_t
 {
@@ -71,6 +72,7 @@ typedef enum PetStatuses : uint32_t
     PetFail = 0xC0000001,
     PetInvalidArg = 0xC0000002,
     PetNotImplemented = 0xC0000003,
+    PetOutOfMemory = 0xC0000004,
 } PetStatuses;
 #endif
 
@@ -86,6 +88,9 @@ inline bool IsStatusError(const PetStatus status)
 
 #define PET_AI_VERSION_1_0 10
 #define PET_AI_VERSION PET_AI_VERSION_1_0
+
+#define PET_RENDERER_VERSION_1_0 10
+#define PET_RENDERER_VERSION PET_AI_VERSION_1_0
 
 typedef struct PetAIHandle {
     // ReSharper disable once CppInconsistentNaming
@@ -231,6 +236,8 @@ typedef PetStatus PetEvent_f(PetAppHandle petAppHandle, const PetEventData* pPet
 
 typedef PetStatus GetScreenSize_f(PetRendererHandle rendererHandle, uint16_t* pWidth, uint16_t* pHeight);
 
+typedef PetStatus ClearScreen_f(PetRendererHandle rendererHandle, uint8_t r, uint8_t g, uint8_t b, uint16_t depth);
+
 typedef struct ScreenPoint
 {
     uint16_t X;
@@ -262,15 +269,22 @@ typedef struct DrawTriangleData
 
 typedef PetStatus DrawTriangle_f(PetRendererHandle rendererHandle, const DrawTriangleData* pDrawData);
 
+typedef PetStatus CopyFramebuffer_f(PetRendererHandle rendererHandle, uint8_t* pOutFramebuffer, size_t size);
+
 typedef struct PetRendererFunctions
 {
+    uint32_t Version;
     GetScreenSize_f* GetScreenSize;
+    ClearScreen_f* ClearScreen;
     DrawRectangle_f* DrawRectangle;
     DrawTriangle_f* DrawTriangle;
+    CopyFramebuffer_f* CopyFramebuffer;
 } PetRendererFunctions;
 
 typedef PetStatus CreateRenderer_f(PetAppHandle petAppHandle, PetRendererHandle* pOutRendererHandle, PetRendererFunctions* pOutRendererFunctions);
 typedef PetStatus DestroyRenderer_f(PetAppHandle petAppHandle, PetRendererHandle rendererHandle);
+
+typedef PetStatus Present_f(PetAppHandle petAppHandle, PetRendererHandle rendererHandle, const PetRendererFunctions* pRendererFunctions);
 
 typedef PetStatus NotifyExit_f(PetAIHandle petAIHandle);
 typedef PetStatus EnumPets_f(PetAIHandle petAIHandle, PetHandle* pPetHandle, uint32_t index);
@@ -288,7 +302,16 @@ typedef struct CreatePetAIData
 
 typedef PetStatus CreatePetAI_f(PetAIHandle petAIHandle, const CreatePetAIData* pCreatePetData, PetHandle* pPetHandle);
 
-typedef PetStatus CreateDefaultRenderer_f(PetAIHandle petAIHandle, PetRendererHandle* pOutRendererHandle, PetRendererFunctions* pOutRendererFunctions);
+typedef struct CreateDefaultPetRenderer
+{
+    PetRendererHandle* pOutRendererHandle;
+    PetRendererFunctions* pOutRendererFunctions;
+    uint32_t Version;
+    uint16_t Width;
+    uint16_t Height;
+} CreateDefaultPetRenderer;
+
+typedef PetStatus CreateDefaultRenderer_f(PetAIHandle petAIHandle, const CreateDefaultPetRenderer* pCreateDefaultRenderer);
 typedef PetStatus DestroyDefaultRenderer_f(PetAIHandle petAIHandle, PetRendererHandle rendererHandle);
 
 typedef struct PetAICallbacks
@@ -322,6 +345,8 @@ typedef struct PetFunctions
 
     CreateRenderer_f* CreateRenderer;
     DestroyRenderer_f* DestroyRenderer;
+
+    Present_f* Present;
 } PetFunctions;
 
 PetStatus TAU_UTILS_LIB InitPetAI(const PetFunctions* const pFunctions);

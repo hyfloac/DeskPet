@@ -14,7 +14,7 @@ static ::std::int32_t SelectLifeStageTree(PetManager& petManager, const Behavior
 static bool ContinueTree(PetManager& petManager, const BehaviorTreeRepeatNode& node, Blackboard& blackboard) noexcept;
 
 static BlackboardKey s_SleepTimeKey;
-static const BlackboardKeyName::KeyChar* s_SleepTimeKeyName = CSTR("Sleep5s.Time");
+static const BlackboardKeyName::KeyChar* s_SleepTimeKeyName = CSTR("SleepXs.Time");
 
 static BlackboardKey s_BarkSequenceKey;
 static const BlackboardKeyName::KeyChar* s_BarkSequenceKeyName = CSTR("BarkSequence.SequenceKey");

@@ -11,6 +11,9 @@
 class NixCliPet final
 {
 public:
+    static constexpr uint16_t FramebufferWidth = 36;
+    static constexpr uint16_t FramebufferHeight = 9;
+public:
     static NixCliPet* FromHandle(const PetAppHandle handle) noexcept
     {
         return static_cast<NixCliPet*>(handle.Ptr);
@@ -35,8 +38,14 @@ public:
     PetStatus Update(const float deltaTime) noexcept;
 
     PetStatus CreatePet(const CreatePetData* const pCreatePetData) noexcept;
+
+    PetStatus CreateRenderer(PetRendererHandle* const pOutRendererHandle, PetRendererFunctions* const pOutRendererFunctions) noexcept;
+    PetStatus DestroyRenderer(const PetRendererHandle rendererHandle) noexcept;
+
+    PetStatus Present(PetRendererHandle rendererHandle, const PetRendererFunctions* pRendererFunctions) noexcept;
 private:
     PetAICallbacks m_Callbacks;  // NOLINT(clang-diagnostic-unused-private-field)
+    uint8_t m_Framebuffer[static_cast<size_t>(FramebufferWidth) * static_cast<size_t>(FramebufferHeight) * 3];
 };
 
 static PetStatus CreatePetApp(PetAppHandle* const pOutPetAppHandle, const PetAICallbacks* const pPetAICallbacks);
@@ -51,6 +60,11 @@ static PetStatus Yield(const PetAppHandle petAppHandle, TimeMs_t* const pSleepTi
 static PetStatus Update(const PetAppHandle petAppHandle, const float deltaTime);
 
 static PetStatus CreatePet(const PetAppHandle petAppHandle, const CreatePetData* const pCreatePetData);
+
+static PetStatus CreateRenderer(const PetAppHandle petAppHandle, PetRendererHandle* const pOutRendererHandle, PetRendererFunctions* const pOutRendererFunctions);
+static PetStatus DestroyRenderer(const PetAppHandle petAppHandle, const PetRendererHandle rendererHandle);
+
+static PetStatus Present(const PetAppHandle petAppHandle, const PetRendererHandle rendererHandle, const PetRendererFunctions* const pRendererFunctions);
 
 static ::std::atomic_bool s_ShouldExit(false);
 
@@ -71,6 +85,9 @@ int main(int argCount, char* args[])
     petFunctions.Yield = Yield;
     petFunctions.Update = Update;
     petFunctions.CreatePet = CreatePet;
+    petFunctions.CreateRenderer = CreateRenderer;
+    petFunctions.DestroyRenderer = DestroyRenderer;
+    petFunctions.Present = Present;
 
     PetStatus status = InitPetAI(&petFunctions);
 
@@ -226,6 +243,65 @@ PetStatus NixCliPet::CreatePet(const CreatePetData* const pCreatePetData) noexce
     return m_Callbacks.CreatePet(m_Callbacks.Handle, &createData, nullptr);
 }
 
+PetStatus NixCliPet::CreateRenderer(PetRendererHandle* const pOutRendererHandle, PetRendererFunctions* const pOutRendererFunctions) noexcept
+{
+    CreateDefaultPetRenderer createData {};
+    createData.pOutRendererHandle = pOutRendererHandle;
+    createData.pOutRendererFunctions = pOutRendererFunctions;
+    createData.Version = PET_RENDERER_VERSION;
+    createData.Width = FramebufferWidth;
+    createData.Height = FramebufferHeight;
+
+    return m_Callbacks.CreateDefaultRenderer(m_Callbacks.Handle, &createData);
+}
+
+PetStatus NixCliPet::DestroyRenderer(const PetRendererHandle rendererHandle) noexcept
+{
+    return m_Callbacks.DestroyDefaultRenderer(m_Callbacks.Handle, rendererHandle);
+}
+
+PetStatus NixCliPet::Present(PetRendererHandle rendererHandle, const PetRendererFunctions* pRendererFunctions) noexcept
+{
+    if(!rendererHandle.Ptr)
+    {
+        return PetInvalidArg;
+    }
+
+    if(!pRendererFunctions)
+    {
+        return PetInvalidArg;
+    }
+
+    const PetStatus status = pRendererFunctions->CopyFramebuffer(rendererHandle, m_Framebuffer, sizeof(m_Framebuffer));
+
+    if(IsStatusError(status))
+    {
+        return status;
+    }
+
+    ::std::putc('\n', stdout);
+    for(uint16_t y = 0; y < FramebufferHeight; ++y)
+    {
+        for(uint16_t x = 0; x < FramebufferWidth; ++x)
+        {
+            const size_t i0 = (static_cast<size_t>(FramebufferWidth) * static_cast<size_t>(y) + static_cast<size_t>(x)) * 3;
+            // const size_t i1 = (static_cast<size_t>(FramebufferWidth) * static_cast<size_t>(y + 1) + static_cast<size_t>(x)) * 3;
+            const uint8_t r0 = m_Framebuffer[i0 + 0];
+            const uint8_t g0 = m_Framebuffer[i0 + 1];
+            const uint8_t b0 = m_Framebuffer[i0 + 2];
+            // const uint8_t r1 = m_Framebuffer[i1 + 0];
+            // const uint8_t g1 = m_Framebuffer[i1 + 1];
+            // const uint8_t b1 = m_Framebuffer[i1 + 2];
+
+            // ::std::printf("\033[38;2;%d;%d;%d;48;2;%d;%d;%dm\u2580", r0, g0, b0, r1, g1, b1);
+            ::std::printf("\033[38;2;%d;%d;%dm\u2588", r0, g0, b0);
+        }
+        ::std::puts("\033[0m");
+    }
+
+    return PetSuccess;
+}
+
 static PetStatus CreatePetApp(PetAppHandle* const pOutPetAppHandle, const PetAICallbacks* const pPetAICallbacks)
 {
     if(!pOutPetAppHandle)
@@ -319,7 +395,7 @@ static PetStatus Update(const PetAppHandle petAppHandle, const float deltaTime)
     return pet->Update(deltaTime);
 }
 
-PetStatus CreatePet(const PetAppHandle petAppHandle, const CreatePetData* const pCreatePetData)
+static PetStatus CreatePet(const PetAppHandle petAppHandle, const CreatePetData* const pCreatePetData)
 {
     if(!petAppHandle.Ptr)
     {
@@ -329,6 +405,42 @@ PetStatus CreatePet(const PetAppHandle petAppHandle, const CreatePetData* const 
     NixCliPet* const pet = NixCliPet::FromHandle(petAppHandle);
 
     return pet->CreatePet(pCreatePetData);
+}
+
+static PetStatus CreateRenderer(const PetAppHandle petAppHandle, PetRendererHandle* const pOutRendererHandle, PetRendererFunctions* const pOutRendererFunctions)
+{
+    if(!petAppHandle.Ptr)
+    {
+        return PetInvalidArg;
+    }
+
+    NixCliPet* const pet = NixCliPet::FromHandle(petAppHandle);
+
+    return pet->CreateRenderer(pOutRendererHandle, pOutRendererFunctions);
+}
+
+static PetStatus DestroyRenderer(const PetAppHandle petAppHandle, const PetRendererHandle rendererHandle)
+{
+    if(!petAppHandle.Ptr)
+    {
+        return PetInvalidArg;
+    }
+
+    NixCliPet* const pet = NixCliPet::FromHandle(petAppHandle);
+
+    return pet->DestroyRenderer(rendererHandle);
+}
+
+static PetStatus Present(const PetAppHandle petAppHandle, const PetRendererHandle rendererHandle, const PetRendererFunctions* const pRendererFunctions)
+{
+    if(!petAppHandle.Ptr)
+    {
+        return PetInvalidArg;
+    }
+
+    NixCliPet* const pet = NixCliPet::FromHandle(petAppHandle);
+
+    return pet->Present(rendererHandle, pRendererFunctions);
 }
 
 static void SignalHandler(const int signal) noexcept

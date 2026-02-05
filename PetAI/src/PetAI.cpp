@@ -9,12 +9,11 @@
 
 PetManager g_PetManager;
 
-// ReSharper disable once CppFunctionIsNotImplemented
 static PetStatus NotifyExit(const PetAIHandle petAIHandle);
-// ReSharper disable once CppFunctionIsNotImplemented
 static PetStatus GetPetState(const PetAIHandle petAIHandle, const PetHandle petHandle, void** const pState, uint32_t* const pSize);
-// ReSharper disable once CppFunctionIsNotImplemented
 static PetStatus CreatePet(const PetAIHandle petAIHandle, const CreatePetAIData* const pCreatePetData, PetHandle* const pPetHandle);
+static PetStatus CreateDefaultRenderer(PetAIHandle petAIHandle, const CreateDefaultPetRenderer* pCreateDefaultRenderer);
+static PetStatus DestroyDefaultRenderer(PetAIHandle petAIHandle, PetRendererHandle rendererHandle);
 
 extern "C" PetStatus TAU_UTILS_LIB InitPetAI(const PetFunctions* const pFunctions)
 {
@@ -26,13 +25,32 @@ extern "C" PetStatus TAU_UTILS_LIB InitPetAI(const PetFunctions* const pFunction
         return PetInvalidArg;
     }
 
+    if(pFunctions->Version < PET_AI_VERSION_1_0)
+    {
+        DebugPrintF(u8"[InitPetAI]: pFunctions->Version was not valid (%u).\n", pFunctions->Version);
+        return PetInvalidArg;
+    }
+
     if(!pFunctions->CreatePetApp)
     {
         DebugPrintF(u8"[InitPetAI]: pFunctions->CreatePet was null.\n");
         return PetInvalidArg;
     }
 
-    g_PetManager.AppFunctions() = pFunctions;
+    g_PetManager.AppFunctions().Version = pFunctions->Version;
+    g_PetManager.AppFunctions().CreatePetApp = pFunctions->CreatePetApp;
+    g_PetManager.AppFunctions().DestroyPetApp = pFunctions->DestroyPetApp;
+    g_PetManager.AppFunctions().SavePetState = pFunctions->SavePetState;
+    g_PetManager.AppFunctions().LoadPetState = pFunctions->LoadPetState;
+    g_PetManager.AppFunctions().Sleep = pFunctions->Sleep;
+    g_PetManager.AppFunctions().Yield = pFunctions->Yield;
+    g_PetManager.AppFunctions().Update = pFunctions->Update;
+    g_PetManager.AppFunctions().CreatePet = pFunctions->CreatePet;
+    g_PetManager.AppFunctions().PetEvent = pFunctions->PetEvent;
+    g_PetManager.AppFunctions().CreateRenderer = pFunctions->CreateRenderer;
+    g_PetManager.AppFunctions().DestroyRenderer = pFunctions->DestroyRenderer;
+    g_PetManager.AppFunctions().Present = pFunctions->Present;
+
     g_PetManager.AppHandle().Ptr = nullptr;
     g_PetManager.PetCallbackHandle() = &g_PetManager;
 
@@ -49,7 +67,7 @@ static PetStatus LoadState(const uint8_t** const ppBuffer) noexcept;
 
 extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
 {
-    if(!g_PetManager.AppFunctions())
+    if(!g_PetManager.AppFunctions().CreatePetApp)
     {
         return PetSuccess;
     }
@@ -59,15 +77,22 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
     callbacks.NotifyExit = NotifyExit;
     callbacks.GetPetState = GetPetState;
     callbacks.CreatePet = CreatePet;
-    callbacks.CreateDefaultRenderer = nullptr;
-    callbacks.DestroyDefaultRenderer = nullptr;
+    callbacks.CreateDefaultRenderer = CreateDefaultRenderer;
+    callbacks.DestroyDefaultRenderer = DestroyDefaultRenderer;
 
-    PetStatus status = g_PetManager.AppFunctions()->CreatePetApp(&g_PetManager.AppHandle(), &callbacks);
+    PetStatus status = g_PetManager.AppFunctions().CreatePetApp(&g_PetManager.AppHandle(), &callbacks);
 
     if(!IsStatusSuccess(status))
     {
-        DebugPrintF(u8"[RunPetAI]: pFunctions->CreatePetApp returned status 0x%08X.\n", status);
+        DebugPrintF(u8"[RunPetAI]: g_PetManager.AppFunctions()->CreatePetApp returned status 0x%08X.\n", status);
         return status;
+    }
+
+    status = g_PetManager.CreateRenderer();
+
+    if(!IsStatusSuccess(status))
+    {
+        DebugPrintF(u8"[RunPetAI]: g_PetManager.CreateRenderer returned status 0x%08X.\n", status);
     }
 
     const uint8_t* stateBuffer;
@@ -86,13 +111,15 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
     initialPetData.ParentMale.Ptr = nullptr;
     initialPetData.ParentFemale.Ptr = nullptr;
 
-    status = g_PetManager.AppFunctions()->CreatePet(g_PetManager.AppHandle(), &initialPetData);
+    status = g_PetManager.AppFunctions().CreatePet(g_PetManager.AppHandle(), &initialPetData);
 
     if(!IsStatusSuccess(status))
     {
         DebugPrintF(u8"[RunPetAI]: pFunctions->CreatePet returned status 0x%08X.\n", status);
         return status;
     }
+
+    int32_t iter = 0;
 
     TimeMs_t lastTime = GetCurrentTimeMs();
 
@@ -102,9 +129,9 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
 
         const float deltaTime = static_cast<float>(currentTime - lastTime) / 1000.0f;
 
-        if(g_PetManager.AppFunctions()->Update)
+        if(g_PetManager.AppFunctions().Update)
         {
-            g_PetManager.AppFunctions()->Update(g_PetManager.AppHandle(), deltaTime);
+            g_PetManager.AppFunctions().Update(g_PetManager.AppHandle(), deltaTime);
         }
 
         if(g_PetManager.ShouldExit())
@@ -117,16 +144,23 @@ extern "C" PetStatus TAU_UTILS_LIB RunPetAI()
             pet->BehaviorTreeExecutor().Tick(deltaTime);
         }
 
-        if(g_PetManager.AppFunctions()->Sleep)
+        ++iter;
+
+        if(iter % 200 == 0)
+        {
+            g_PetManager.AppFunctions().Present(g_PetManager.AppHandle(), g_PetManager.RendererHandle(), &g_PetManager.RendererFunctions());
+        }
+
+        if(g_PetManager.AppFunctions().Sleep)
         {
             TimeMs_t sleepTime = 5;
-            g_PetManager.AppFunctions()->Sleep(g_PetManager.AppHandle(), &sleepTime);
+            g_PetManager.AppFunctions().Sleep(g_PetManager.AppHandle(), &sleepTime);
         }
 
         lastTime = currentTime;
     }
 
-    status = g_PetManager.AppFunctions()->DestroyPetApp(g_PetManager.AppHandle());
+    status = g_PetManager.AppFunctions().DestroyPetApp(g_PetManager.AppHandle());
 
     if(!IsStatusSuccess(status))
     {
@@ -141,13 +175,13 @@ static PetStatus LoadState(const uint8_t** const ppBuffer) noexcept
 {
     constexpr PetFileHandle dummyFileHandle = 1337;
 
-    if(!g_PetManager.AppFunctions()->LoadPetState)
+    if(!g_PetManager.AppFunctions().LoadPetState)
     {
         return PetNotImplemented;
     }
 
     size_t stateSize;
-    PetStatus status = g_PetManager.AppFunctions()->LoadPetState(g_PetManager.AppHandle(), dummyFileHandle, 0, nullptr, &stateSize);
+    PetStatus status = g_PetManager.AppFunctions().LoadPetState(g_PetManager.AppHandle(), dummyFileHandle, 0, nullptr, &stateSize);
 
     if(!IsStatusSuccess(status))
     {
@@ -163,7 +197,7 @@ static PetStatus LoadState(const uint8_t** const ppBuffer) noexcept
     uint8_t* buffer = new(::std::nothrow) uint8_t[stateSize];
 
     size_t stateSizeRead;
-    status = g_PetManager.AppFunctions()->LoadPetState(g_PetManager.AppHandle(), dummyFileHandle, 0, buffer, &stateSizeRead);
+    status = g_PetManager.AppFunctions().LoadPetState(g_PetManager.AppHandle(), dummyFileHandle, 0, buffer, &stateSizeRead);
 
     if(!IsStatusSuccess(status))
     {
@@ -211,4 +245,24 @@ static PetStatus CreatePet(const PetAIHandle petAIHandle, const CreatePetAIData*
     }
 
     return PetManager::FromHandle(petAIHandle)->CreatePet(pCreatePetData, pPetHandle);
+}
+
+static PetStatus CreateDefaultRenderer(const PetAIHandle petAIHandle, const CreateDefaultPetRenderer* const pCreateDefaultRenderer)
+{
+    if(!petAIHandle.Ptr)
+    {
+        return PetInvalidArg;
+    }
+
+    return PetManager::FromHandle(petAIHandle)->CreateDefaultRenderer(pCreateDefaultRenderer);
+}
+
+static PetStatus DestroyDefaultRenderer(const PetAIHandle petAIHandle, const PetRendererHandle rendererHandle)
+{
+    if(!petAIHandle.Ptr)
+    {
+        return PetInvalidArg;
+    }
+
+    return PetManager::FromHandle(petAIHandle)->DestroyDefaultRenderer(rendererHandle);
 }
