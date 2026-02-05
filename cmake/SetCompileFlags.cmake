@@ -2,24 +2,56 @@ function(SetCompileFlags ProjectName PublicType PrivateType UseDLL)
     # Set C++20
     target_compile_features(${ProjectName} ${PublicType} cxx_std_20)
 
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
         if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
             # using clang with clang-cl front end
 
-            target_compile_options(${ProjectName} ${PrivateType} -Wno-unknown-attributes)
+            target_compile_options(${PROJECT_NAME} PRIVATE -Wno-unknown-attributes)
         elseif(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
             # using clang with regular front end
 
-            target_compile_options(${ProjectName} ${PrivateType} -Wno-unknown-attributes)
+            target_compile_options(${PROJECT_NAME} PRIVATE -Wno-unknown-attributes)
 
             # Disable RTTI and exceptions
             target_compile_options(${ProjectName} ${PrivateType} -fno-rtti -fno-exceptions)
 
             # Enable PIC
-            set_target_properties(${ProjectName} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+            set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+            # Broken on macOS
             # Attempt to enable Link Time Optimization
-            set_target_properties(${ProjectName} PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
+            #        set_target_properties(${PROJECT_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
+        endif()
+
+        check_c_compiler_flag("-fsanitize=address" HAS_SANITIZE_ADDRESS)
+        check_c_compiler_flag(-fno-omit-frame-pointer HAS_NO_OMIT_FRAME_POINTER)
+        check_c_compiler_flag(-g HAS_GENERATE_DEBUG_INFO)
+        check_c_compiler_flag(-Wall HAS_W_ALL)
+        check_c_compiler_flag(-Wextra HAS_W_EXTRA)
+        check_c_compiler_flag(-pedantic HAS_PEDANTIC)
+
+        if(HAS_SANITIZE_ADDRESS)
+            target_compile_options(${PROJECT_NAME} PRIVATE "-fsanitize=address")
+        endif()
+
+        if(HAS_NO_OMIT_FRAME_POINTER)
+            target_compile_options(${PROJECT_NAME} PRIVATE -fno-omit-frame-pointer)
+        endif()
+
+        if(HAS_GENERATE_DEBUG_INFO)
+            target_compile_options(${PROJECT_NAME} PRIVATE -g)
+        endif()
+
+        if(HAS_W_ALL)
+            target_compile_options(${PROJECT_NAME} PRIVATE -Wall)
+        endif()
+
+        if(HAS_W_EXTRA)
+            target_compile_options(${PROJECT_NAME} PRIVATE -Wextra)
+        endif()
+
+        if(HAS_PEDANTIC)
+            target_compile_options(${PROJECT_NAME} PRIVATE -pedantic)
         endif()
     endif()
 
