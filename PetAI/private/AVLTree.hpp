@@ -23,7 +23,7 @@ enum class InsertMethod
 enum class IteratorMethod
 {
     TopDownLR = 0,
-    TopDownRL = 0,
+    TopDownRL,
     HighestToLowest,
     LowestToHighest
 };
